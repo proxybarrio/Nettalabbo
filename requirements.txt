@@ -1,4 +1,4 @@
-Nettalabbo 0.5.3 (Debian package revision 2)
+Nettalabbo 0.5.4 (Debian package revision 1)
 
 Mandatory runtime dependencies (APT installs these):
   python3 (>= 3.8)
