@@ -6,7 +6,7 @@ import re
 
 def txt_value(value):
     """Join quoted character strings within one TXT resource record."""
-    parts = re.findall(r'"(?:[^"\\]|\\.)*"|\\S+', value)
+    parts = re.findall(r'"(?:[^"\\]|\\.)*"|\S+', value)
     return ''.join(part[1:-1].replace('\\\"', '"') if part.startswith('"') and part.endswith('"') else part for part in parts)
 
 def spf_review(records):
