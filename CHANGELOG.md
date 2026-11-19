@@ -6,6 +6,11 @@
 - Legacy Navigator: Classic, Dark and Monochrome palettes without changing links, Back/Forward/Home/Stop or Raw view.
 - Updates: a redirect away from GitHub is now rejected before any request is sent to the new host, not only checked afterwards.
 - Diagnose: SPF review accepts CIDR lengths on `a` and `mx` (for example `a/24`, `mx:host/24`) and ignores unknown modifiers as RFC 7208 requires; TXT values without quotes are read correctly.
+- Diagnose (after live testing against local DNS, SMTP and DNSBL test servers): MTA-STS and TLS-RPT records are read without quotes and checked for the right version and duplicates; an untrusted STARTTLS certificate is reported as a warning with an explanation; a refused port 25 mentions that many providers block it; a skipped IP blacklist check is now stated; multi-line results are indented; the page no longer repeats its title.
+- Port Scan: the default port range 1-1024 is now accepted (the limit was 128 ports, so enabling Scan Ports with the defaults showed an error); the limit is now 1024 ports, made practical by concurrent probing.
+- Window: the status bar with Help and Quit was hidden at the default window size (the content needed 953 pixels in an 820-pixel window); it is now always visible, and the first window size fits smaller laptop screens.
+- Updates: a failed automatic check counts as the daily check, so an unreachable release page is not contacted at every start.
+- SSH: the information line no longer gets cut off; DNS page description mentions record types.
 - Added regression tests and verification workflow for the new components. Live network, SMTP, DNSBL and Xubuntu installation checks are still required before public release.
 
 ## 0.5.3 Debian revision 9 (19 November 2026)

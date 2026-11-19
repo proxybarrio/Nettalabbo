@@ -91,3 +91,67 @@ class DiagnoseTests(unittest.TestCase):
         self.assertTrue(any(x.name=='MX records' and x.status=='unknown' for x in r.checks))
 if __name__=='__main__':
     unittest.main()
+
+
+class DiagnoseLiveFindingsTest(unittest.TestCase):
+    """Cases found while testing against real local DNS and SMTP servers."""
+
+    def base(self):
+        return FakeResolver({
+            ('example.org', 'A'): ['93.184.216.34'],
+            ('example.org', 'MX'): ['10 mail.example.org.'],
+            ('mail.example.org', 'A'): ['127.0.0.1'],
+        })
+
+    def status(self, report, name):
+        return [(x.status, x.detail) for x in report.checks if x.name == name]
+
+    def test_mta_sts_and_tls_rpt_are_parsed_and_validated(self):
+        fake = self.base()
+        fake.answers[('_mta-sts.example.org', 'TXT')] = ['"v=STSv1; id=20261119"']
+        fake.answers[('_smtp._tls.example.org', 'TXT')] = ['"v=TLSRPTv1; rua=mailto:tls@example.org"']
+        report = diagnose('example.org', fake)
+        self.assertEqual(self.status(report, 'MTA STS'), [('pass', 'v=STSv1; id=20261119')])
+        self.assertEqual(self.status(report, 'TLS RPT')[0][0], 'pass')
+
+    def test_mta_sts_wrong_or_duplicate(self):
+        fake = self.base()
+        fake.answers[('_mta-sts.example.org', 'TXT')] = ['"hello"']
+        fake.answers[('_smtp._tls.example.org', 'TXT')] = ['"v=TLSRPTv1; rua=a"', '"v=TLSRPTv1; rua=b"']
+        report = diagnose('example.org', fake)
+        self.assertEqual(self.status(report, 'MTA STS')[0][0], 'warn')
+        self.assertEqual(self.status(report, 'TLS RPT')[0][0], 'fail')
+
+    def test_ip_dnsbl_skip_is_reported(self):
+        report = diagnose('example.org', self.base(), check_blacklists=True)
+        self.assertEqual(self.status(report, 'IP DNSBL')[0][0], 'skipped')
+        self.assertIn('public', self.status(report, 'IP DNSBL')[0][1])
+
+    def smtp_status(self, error):
+        def probe(kind, host, port):
+            raise error
+        report = diagnose('example.org', self.base(), check_smtp=True, mail_probe=probe)
+        return self.status(report, 'SMTP connectivity')[0]
+
+    def test_untrusted_certificate_is_a_warning(self):
+        import ssl
+        status, detail = self.smtp_status(ssl.SSLCertVerificationError('certificate verify failed'))
+        self.assertEqual(status, 'warn')
+        self.assertIn('could not be verified', detail)
+
+    def test_refused_port_25_explains_isp_blocking(self):
+        status, detail = self.smtp_status(ConnectionRefusedError(111, 'Connection refused'))
+        self.assertEqual(status, 'unknown')
+        self.assertIn('port 25', detail)
+
+    def test_multiline_details_are_indented(self):
+        fake = self.base()
+        probe = lambda kind, host, port: 'SMTP connection: x\nEHLO: 250 ok\nTLS negotiated: yes\n'
+        text = diagnose('example.org', fake, check_smtp=True, mail_probe=probe).as_text()
+        self.assertIn('\n    EHLO: 250 ok', text)
+        self.assertNotIn('\nTLS negotiated', text)
+
+
+if __name__ == "__main__":
+    unittest.main()
+

@@ -71,6 +71,9 @@ def _restrict_mode(path, mode):
             pass
 
 
+MAX_SCAN_PORTS = 1024
+
+
 def open_tcp_ports(host, ports, timeout, stop=None, batch=32):
     """Return the ports of host that accept a TCP connection.
 
@@ -180,7 +183,7 @@ PAGE_DESCRIPTIONS = {
     'Mail Inspector': 'Inspect MX routing, optional single-address SMTP acceptance, and POP3/IMAP/SMTP connectivity.',
     'Diagnose': 'Inspect DNS, MX, SPF, DMARC, DKIM and opt-in DNS blacklists.',
     'Domain Inspector': 'Identify a public domain registry, then request available registration information.',
-    'DNS': 'Resolve domain names and inspect addresses.',
+    'DNS': 'Resolve names, or query a record type (MX, TXT, NS, SOA, CAA and more) on any DNS server.',
     'WhoIs': 'Query a chosen WHOIS server directly, or use Domain Inspector for automatic discovery.',
     'Ping': 'Measure network reachability and response time.',
     'Trace': 'Trace the network route to a remote host.',
@@ -206,8 +209,11 @@ class App:
         self.app_icon = self.load_image(64)
         if self.app_icon is not None:
             self.root.iconphoto(True, self.app_icon)
-        self.root.geometry('1160x820')
-        self.root.minsize(1020, 700)
+        # Fit the first window to small laptop screens (e.g. 1366x768) as well.
+        screen_w, screen_h = self.root.winfo_screenwidth(), self.root.winfo_screenheight()
+        width, height = min(1160, max(800, screen_w - 40)), min(820, max(560, screen_h - 80))
+        self.root.geometry(f'{width}x{height}')
+        self.root.minsize(min(1020, width), min(700, height))
         self.root.protocol('WM_DELETE_WINDOW', self.close)
         self.tasks = {}
         self.failed_tasks = set()
@@ -331,7 +337,9 @@ class App:
         self.make_options_page()
         self.make_about_page()
         footer = tk.Frame(root, bg='#eaf3f8')
-        footer.pack(fill='x', padx=13, pady=(0, 9))
+        # Packed before the body so the status line, Help and Quit stay visible
+        # even when a page asks for more height than the window has.
+        footer.pack(fill='x', padx=13, pady=(0, 9), side='bottom', before=body)
         self.footer_status = tk.StringVar(value='Ready. No network operations run at startup.')
         tk.Label(footer, textvariable=self.footer_status, bg='#eaf3f8', fg='#34596c').pack(side='left', fill='x', expand=True)
         ttk.Button(footer, text='Help', command=self.show_help, width=10).pack(side='right', padx=(6, 0))
@@ -1418,8 +1426,10 @@ class App:
             ranges=[]
             if self.scan_ports.get():
                 lo,hi=self.scan_pstart.get(),self.scan_pend.get()
-                if not (1<=lo<=hi<=65535) or hi-lo+1>128:
-                    raise ValueError('Port range must contain 1–128 TCP ports.')
+                # Ports are probed concurrently in batches, so the well-known range 1-1024
+                # (the default) completes in about 32 timeouts per silent host at most.
+                if not (1<=lo<=hi<=65535) or hi-lo+1>MAX_SCAN_PORTS:
+                    raise ValueError(f'Port range must contain 1–{MAX_SCAN_PORTS} TCP ports.')
                 ranges=list(range(lo,hi+1))
             svcs=[(k,p) for k,p in SERVICE_PORTS.items() if p is not None and self.service_flags[k].get()]
             ports=sorted(set(ranges+[p for _,p in svcs]))
@@ -1487,7 +1497,8 @@ class App:
             ttk.Label(form, text='Private key').grid(row=2, column=0, sticky='w', padx=(0, 6), pady=5)
             ttk.Entry(form, textvariable=self.inputs['SSH_key']).grid(row=2, column=1, columnspan=2, sticky='ew', padx=(0, 6), pady=5)
             ttk.Button(form, text='Browse…', command=self.choose_ssh_key).grid(row=2, column=3, sticky='w')
-            ttk.Label(f, text='OpenSSH verifies host keys using your normal SSH configuration. Passwords are entered in the terminal and are never stored by Nettalabbo.').pack(anchor='w', pady=(0, 7))
+            ttk.Label(f, text='OpenSSH verifies host keys using your normal SSH configuration. Passwords are entered in the terminal and are never stored by Nettalabbo.',
+                      wraplength=890).pack(anchor='w', pady=(0, 7))
         else:
             ttk.Label(f, text='WARNING: Telnet does not encrypt credentials or network traffic. Use only on trusted networks and legacy equipment.',
                       foreground='#a02020', wraplength=890).pack(anchor='w', pady=(2, 7))
@@ -1529,11 +1540,8 @@ class App:
         """Read-only domain/mail diagnostics; optional DNSBL is opt-in."""
         page = 'Diagnose'
         frame = self.pages[page]
-        ttk.Label(frame, text='Domain and Mail Diagnose',
-                  font=('Sans', 14, 'bold')).pack(anchor='w')
-        ttk.Label(frame, text='DNS, MX, SPF, DMARC, optional DKIM and DNS blacklists. '
-                  'Results are diagnostic, not deliverability guarantees.',
-                  wraplength=750).pack(anchor='w', pady=(3, 9))
+        ttk.Label(frame, text='Results are diagnostic, not deliverability guarantees.',
+                  wraplength=750).pack(anchor='w', pady=(0, 9))
         form = ttk.Frame(frame)
         form.pack(fill='x', pady=(0, 8))
         ttk.Label(form, text='Domain:').pack(side='left', padx=(0, 5))
@@ -2549,6 +2557,9 @@ class App:
                     path = updater.download(release)
                     self.post(self.offer_update, release, path)
             except updater.UpdateError as exc:
+                # A failed automatic check also counts as today's check, so an
+                # unreachable or private release page is not contacted at every start.
+                self.post(lambda: self.update_prefs().__setitem__('last_check', time.time()))
                 self.post(self.report_update, f'Update check: {exc}', manual)
             except Exception as exc:
                 self.post(self.report_update, f'Update check failed: {exc}', manual)

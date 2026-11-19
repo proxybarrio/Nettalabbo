@@ -8,9 +8,11 @@ from __future__ import annotations
 import ipaddress
 import re
 import shutil
+import socket
+import ssl
 import subprocess
 from dataclasses import dataclass, field
-from mail_policy import spf_review, dmarc_review, dkim_review
+from mail_policy import spf_review, dmarc_review, dkim_review, txt_value
 
 DOMAIN_DNSBL = ('dbl.spamhaus.org',)
 IP_DNSBL = ('zen.spamhaus.org', 'bl.spamcop.net')
@@ -33,9 +35,11 @@ class Report:
         self.checks.append(Check(name, status, str(detail)))
 
     def as_text(self):
-        return ('Domain diagnostics: ' + self.domain + '\n\n' +
-                '\n'.join(f'[{x.status.upper()}] {x.name}: {x.detail}'
-                          for x in self.checks))
+        lines = []
+        for x in self.checks:
+            detail = x.detail.strip().replace('\n', '\n    ')
+            lines.append(f'[{x.status.upper()}] {x.name}: {detail}')
+        return 'Domain diagnostics: ' + self.domain + '\n\n' + '\n'.join(lines)
 
 
 def domain_name(raw):
@@ -93,6 +97,14 @@ class Dig:
             if len(parts) >= 5 and parts[3] == rtype and parts[2] == 'IN':
                 answers.append(parts[4].strip())
         return answers
+
+
+def _is_public_ipv4(address):
+    try:
+        parsed = ipaddress.ip_address(address)
+    except ValueError:
+        return False
+    return parsed.version == 4 and parsed.is_global
 
 
 def _query(report, resolver, name, rtype, label):
@@ -203,14 +215,24 @@ def diagnose(domain, resolver=None, *, check_blacklists=False, dkim_selector='',
     else:
         report.add('DKIM', 'skipped', 'Selector required; DKIM cannot be reliably discovered automatically')
 
-    for name, record, kind in (
-        ('MTA STS', '_mta-sts.' + domain, 'TXT'),
-        ('TLS RPT', '_smtp._tls.' + domain, 'TXT')
+    for name, record, version in (
+        ('MTA STS', '_mta-sts.' + domain, 'v=STSv1'),
+        ('TLS RPT', '_smtp._tls.' + domain, 'v=TLSRPTv1')
     ):
-        txt = _query(report, resolver, record, kind, name)
-        if txt is not None:
-            report.add(name, 'pass' if txt else 'warn',
-                       '; '.join(txt[:2])[:250] if txt else 'No policy record found')
+        txt = _query(report, resolver, record, 'TXT', name)
+        if txt is None:
+            continue
+        policies = [txt_value(x) for x in txt]
+        valid = [x for x in policies if x.replace(' ', '').lower().startswith(version.lower() + ';')
+                 or x.strip().lower() == version.lower()]
+        if not policies:
+            report.add(name, 'warn', 'No policy record found')
+        elif len(valid) == 1:
+            report.add(name, 'pass', valid[0][:250])
+        elif len(valid) > 1:
+            report.add(name, 'fail', 'More than one ' + version + ' record')
+        else:
+            report.add(name, 'warn', 'Record does not start with ' + version + ': ' + policies[0][:120])
 
     if check_smtp:
         if mx_hosts:
@@ -223,6 +245,16 @@ def diagnose(domain, resolver=None, *, check_blacklists=False, dkim_selector='',
                 secure = 'TLS negotiated: yes' in greeting
                 report.add('SMTP connectivity', 'pass' if secure else 'warn',
                            greeting[:500])
+            except ssl.SSLCertVerificationError as exc:
+                report.add('SMTP connectivity', 'warn',
+                           'STARTTLS is offered but the certificate could not be verified '
+                           '(' + str(getattr(exc, 'verify_message', '') or exc)[:160] + '). '
+                           'Many senders still deliver with unverified TLS.')
+            except (ConnectionRefusedError, socket.timeout, TimeoutError) as exc:
+                report.add('SMTP connectivity', 'unknown',
+                           'No connection to ' + mx_hosts[0] + ':25 (' + str(exc)[:80] + '). '
+                           'Many home and mobile providers block outgoing port 25, so this '
+                           'does not prove that the server is down.')
             except Exception as exc:
                 report.add('SMTP connectivity', 'unknown', str(exc)[:300])
         else:
@@ -239,6 +271,10 @@ def diagnose(domain, resolver=None, *, check_blacklists=False, dkim_selector='',
     for zone in DOMAIN_DNSBL:
         _dnsbl_lookup(report, resolver, domain, zone, 'Domain DNSBL: ' + zone)
     found = set()
+    if not any(_is_public_ipv4(a) for a in mail_addresses):
+        report.add('IP DNSBL', 'skipped',
+                   'No public IPv4 address found for the MX servers' if mail_addresses
+                   else 'No MX server address to check')
     for address in mail_addresses:
         try:
             parsed = ipaddress.ip_address(address)

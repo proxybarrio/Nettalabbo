@@ -93,6 +93,38 @@ class SortedRowsTest(GuiCase):
         self.assertEqual(numbers, [2, 3, 7, 10])
 
 
+class ScannerDefaultsTest(GuiCase):
+    def test_default_port_range_is_accepted(self):
+        self.app.scan_ports.set(True)
+        self.assertEqual((self.app.scan_pstart.get(), self.app.scan_pend.get()), (1, 1024))
+        with patch.object(nettalabbo.messagebox, 'showerror') as error, \
+                patch.object(nettalabbo, 'open_tcp_ports', return_value=[]):
+            self.app.execute_scan()
+            for _ in range(40):
+                self.root.update()
+                if 'Scanner' not in self.app.tasks:
+                    break
+                time.sleep(0.05)
+        error.assert_not_called()
+
+    def test_too_many_ports_rejected(self):
+        self.app.scan_ports.set(True)
+        self.app.scan_pend.set(nettalabbo.MAX_SCAN_PORTS + 1)
+        with patch.object(nettalabbo.messagebox, 'showerror') as error:
+            self.app.execute_scan()
+        error.assert_called_once()
+
+
+class LayoutTest(GuiCase):
+    def test_footer_visible_at_start(self):
+        self.root.deiconify()
+        for page in ('Overview', 'Legacy Navigator', 'Diagnose'):
+            self.app.select_page(page)
+            self.root.update()
+            footer = [w for w in self.root.winfo_children() if isinstance(w, tk.Frame)][-1]
+            self.assertLessEqual(footer.winfo_y() + footer.winfo_height(), self.root.winfo_height(), page)
+
+
 class PrintTest(GuiCase):
     def fake_tools(self, folder, default='Office_Laser'):
         bin_dir = Path(folder)
