@@ -44,8 +44,8 @@ from legacy_theme import THEME_NAMES as LEGACY_THEME_NAMES, palette as legacy_pa
 from urllib.parse import urlsplit, urlunsplit, quote as url_quote
 import webbrowser
 
-VERSION = '0.5.3'
-PACKAGE_VERSION = '0.5.3-9'  # must match packaging/control
+VERSION = '0.5.4'
+PACKAGE_VERSION = '0.5.4-1'  # must match packaging/control
 APP_DIR = Path.home() / '.config' / 'nettalabbo'
 ASSETS_DIR = Path(__file__).resolve().parent / 'assets'
 LEGACY_SETTINGS_FILES = [
