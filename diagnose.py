@@ -132,13 +132,12 @@ def diagnose(domain, resolver=None, *, check_blacklists=False, dkim_selector='')
     resolver = resolver or Dig()
     report = Report(domain)
 
-    addresses = []
+    mail_addresses = []
     for kind in ('A', 'AAAA'):
         result = _query(report, resolver, domain, kind, kind + ' records')
         if result is not None:
             report.add(kind + ' records', 'pass' if result else 'warn',
                        ', '.join(result[:8]) if result else 'No records found')
-            addresses.extend(result[:8])
 
     mx = _query(report, resolver, domain, 'MX', 'MX records')
     mx_hosts = []
@@ -169,7 +168,7 @@ def diagnose(domain, resolver=None, *, check_blacklists=False, dkim_selector='')
                             report.add(host + ' ' + kind, 'warn', 'No address returned')
                         else:
                             report.add(host + ' ' + kind, 'pass', ', '.join(target[:4]))
-                            addresses.extend(target[:4])
+                            mail_addresses.extend(target[:4])
 
     spf = _query(report, resolver, domain, 'TXT', 'SPF')
     if spf is not None:
@@ -223,7 +222,7 @@ def diagnose(domain, resolver=None, *, check_blacklists=False, dkim_selector='')
     for zone in DOMAIN_DNSBL:
         _dnsbl_lookup(report, resolver, domain, zone, 'Domain DNSBL: ' + zone)
     found = set()
-    for address in addresses:
+    for address in mail_addresses:
         try:
             parsed = ipaddress.ip_address(address)
         except ValueError:
