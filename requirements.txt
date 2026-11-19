@@ -1,0 +1,19 @@
+Nettalabbo 0.5.3 (Debian package revision 2)
+
+Mandatory runtime dependencies (APT installs these):
+  python3 (>= 3.8)
+  python3-tk
+  iputils-ping
+  traceroute
+  openssh-client
+  telnet
+  ca-certificates
+  bind9-dnsutils | dnsutils  (installs dig for Mail Server Inspector)
+
+Python libraries: standard library only. No pip / venv required.
+
+To install all dependencies before the application, use:
+  bash ./install-nettalabbo.sh
+
+The installer performs a dry-run first, installs all required packages via APT, checks
+Python/Tkinter and command availability, then upgrades the local .deb.

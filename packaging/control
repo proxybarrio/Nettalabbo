@@ -1,0 +1,23 @@
+Package: nettalabbo
+Version: 0.5.3-8
+Section: net
+Priority: optional
+Architecture: all
+Installed-Size: 5000
+Depends: python3 (>= 3.8), python3-tk, iputils-ping, traceroute, openssh-client, telnet, ca-certificates, bind9-dnsutils | dnsutils
+Conflicts: netlabbo, network-laboratory-xubuntu, netlab-xubuntu
+Replaces: netlabbo, network-laboratory-xubuntu, netlab-xubuntu
+Maintainer: Proxybarrio <proxybar@gmail.com>
+Description: Nettalabbo - open source network laboratory for Ubuntu
+ Nettalabbo is an experimental desktop toolkit for Xubuntu and other
+ Ubuntu systems. It brings classic network diagnostics and alternative
+ Internet protocols together in one retro-inspired, independent interface.
+ .
+ Check DNS, Ping and Trace; inspect domain registration through RDAP and
+ WHOIS; scan ports; and examine mail routing and server connectivity.
+ Connect to SSH or Telnet systems, or explore Gopher, Gemini and other
+ alternative networks with clickable links, history and raw protocol views.
+ .
+ Created by Proxybarrio with AI-assisted development. MIT licensed.
+ Active test release: incomplete features and bugs are expected.
+ Bug reports and feedback are welcome on GitHub under Proxybarrio.

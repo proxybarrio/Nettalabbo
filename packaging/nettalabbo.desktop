@@ -1,0 +1,12 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Nettalabbo
+GenericName=Network Laboratory app for Xubuntu and other Ubuntu systems
+Comment=Network diagnostics, RDAP and WHOIS, mail inspection and alternative Internet protocols
+Exec=nettalabbo
+Icon=nettalabbo
+Terminal=false
+Categories=Network;Utility;
+Keywords=Network;Ping;Trace;Traceroute;DNS;RDAP;WHOIS;Mail;SMTP;SSH;Telnet;Gopher;Gemini;
+StartupNotify=true

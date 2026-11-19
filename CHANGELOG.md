@@ -4,7 +4,8 @@
 - Trace: selectable Auto, ICMP, TCP and UDP methods; Auto retries alternate supported probe methods if no hop replies.
 - Trace: improved IPv4/IPv6 parsing, errors for missing tools and zero replies, and partial route status when arrival cannot be confirmed.
 - Ping: flag zero replies as failed rather than falsely completed.
-- Added offline regression tests for Trace and its fallback behaviour.
+- SSH/Telnet PTY: attach a controlling terminal with util-linux setsid to allow OpenSSH to request authentication directly, rather than falling back to ssh_askpass.
+- Added offline regression tests for Trace, its fallback behaviour, and controlling-terminal support.
 - Functional correction still requires live verification on Xubuntu and varied networks; existing release blockers remain.
 
 ## 0.5.3 Debian revision 7 (19 November 2026)

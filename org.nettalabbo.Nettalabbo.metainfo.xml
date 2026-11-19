@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>org.nettalabbo.Nettalabbo</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <name>Nettalabbo</name>
+  <developer_name>Proxybarrio</developer_name>
+  <summary>Network Laboratory app for Xubuntu and other Ubuntu systems</summary>
+  <description>
+    <p>Nettalabbo is an independent, open source network laboratory for Xubuntu and other Ubuntu systems. It combines classic Internet diagnostics with modern domain, email and network inspection tools, plus experimental clients for historic and alternative networks.</p>
+    <p>Check DNS, Ping and Traceroute, scan ports, inspect domain registries through public RDAP and WHOIS, and examine mail routing and server connectivity. Explore SSH and Telnet remote access using the system clients.</p>
+    <p>Explore Gopher, Gemini and other alternative protocols with coloured, permanently underlined hyperlinks, Back and Forward navigation, a Links menu, and Rendered and Raw views. Protocol capabilities vary; some clients are experimental or incomplete.</p>
+    <p>Created by Proxybarrio with AI-assisted development, under the MIT licence. Nettalabbo is an independent tribute to historical network utilities, not an official port or continuation of any of them.</p>
+    <p>This is an active testing release with known and unknown bugs. Feedback and reproducible bug reports are welcome through the Proxybarrio project on GitHub.</p>
+  </description>
+  <launchable type="desktop-id">nettalabbo.desktop</launchable>
+  <icon type="stock">nettalabbo</icon>
+  <icon type="local">/usr/share/pixmaps/nettalabbo.png</icon>
+  <categories>
+    <category>Network</category>
+    <category>Utility</category>
+  </categories>
+  <provides><binary>nettalabbo</binary></provides>
+  <releases>
+    <release version="0.5.3" date="2026-11-18">
+      <description>
+        <p>Clickable hyperlinks in alternative-network documents, including links found inside plain text responses; links are shown in the Links menu.</p>
+      </description>
+    </release>
+    <release version="0.5.2" date="2026-11-18">
+      <description><p>Browser-style navigation, coloured underlined links, Raw view and Stop control for legacy protocols.</p></description>
+    </release>
+    <release version="0.5.1" date="2026-11-18">
+      <description><p>Historic server directory and remote access interface improvements.</p></description>
+    </release>
+    <release version="0.5.0" date="2026-11-18">
+      <description><p>Mail Server Inspector and experimental alternative protocol extensions.</p></description>
+    </release>
+    <release version="0.4.0" date="2026-11-18">
+      <description><p>Initial alternative-network explorer.</p></description>
+    </release>
+  </releases>
+</component>
