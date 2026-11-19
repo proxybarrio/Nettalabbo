@@ -16,6 +16,7 @@ import queue
 import re
 import shutil
 import socket
+import stat
 import struct
 import subprocess
 import threading
@@ -42,6 +43,44 @@ LEGACY_SETTINGS_FILES = [
     Path.home() / '.config' / 'netlab-xubuntu' / 'settings.json',
 ]
 SETTINGS_FILE = APP_DIR / 'settings.json'
+
+
+def _restrict_mode(path, mode):
+    """chmod a path owned by the current user, never following symlinks."""
+    try:
+        info = path.lstat()
+    except OSError:
+        return
+    if stat.S_ISLNK(info.st_mode) or info.st_uid != os.getuid():
+        return
+    if stat.S_IMODE(info.st_mode) & ~mode:
+        try:
+            path.chmod(mode)
+        except OSError:
+            pass
+
+
+def harden_private_paths(app_dir=None, legacy_files=None):
+    """Tighten permissions left by releases that wrote with the default umask.
+
+    Configuration directories become 0700 and the regular files directly
+    inside them 0600, for the current directory and the legacy locations
+    from which settings are still migrated. Nothing is created or deleted.
+    """
+    app_dir = APP_DIR if app_dir is None else app_dir
+    legacy_files = LEGACY_SETTINGS_FILES if legacy_files is None else legacy_files
+    directories = [app_dir, *(Path(p).parent for p in legacy_files)]
+    for directory in directories:
+        if directory.is_symlink() or not directory.is_dir():
+            continue
+        _restrict_mode(directory, 0o700)
+        try:
+            entries = list(directory.iterdir())
+        except OSError:
+            continue
+        for entry in entries:
+            if not entry.is_symlink() and entry.is_file():
+                _restrict_mode(entry, 0o600)
 # Independent navigation architecture, not a recreation of the classic tab strip.
 SECTIONS = {
     'Start': ['Overview'],
@@ -238,6 +277,7 @@ class App:
             return None
 
     def read_settings(self):
+        harden_private_paths()
         try:
             source = next((p for p in [SETTINGS_FILE, *LEGACY_SETTINGS_FILES] if p.exists()), SETTINGS_FILE)
             s = json.loads(source.read_text())
