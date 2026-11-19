@@ -9,6 +9,16 @@ from terminal_colours import ColourTerminalScreen
 from legacy_protocols import LegacyResult
 from legacy_view import segments, distinct_links, raw_text
 from legacy_theme import THEME_NAMES, palette
+from urllib.request import Request
+from updater import _GitHubRedirectHandler, UpdateError
+
+class UpdateRedirectTests(unittest.TestCase):
+    def test_refuses_redirect_to_non_github_host(self):
+        handler = _GitHubRedirectHandler()
+        req = Request('https://github.com/proxybarrio/nettalabbo/releases/latest')
+        with self.assertRaises(UpdateError):
+            handler.redirect_request(req, None, 302, 'Moved', {},
+                                     'https://untrusted.example/download')
 
 class HardenedTerminalTests(unittest.TestCase):
     def test_extreme_cursor_coordinates_are_bounded(self):
