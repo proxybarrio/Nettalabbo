@@ -8,6 +8,7 @@
 - WhoIs: when querying whois.iana.org, the referral to the responsible registry is followed automatically; suggested servers include the regional registries, whois.nic.it and historic servers.
 - Quote: suggested public QOTD servers (default djxmmx.net), followed by historic ones.
 - Privacy: on every start, tighten configuration directories (current and legacy) to 0700 and the files inside them to 0600, fixing permissions left by earlier releases; symlinks and files owned by other users are left untouched.
+- DNS: choose the record type (A, AAAA, CNAME, MX, NS, TXT, SOA, SRV, CAA, PTR, or all common records at once) and optionally a DNS server to ask; results show name, type, TTL and data, with clear messages for non-existent names and server failures. The previous address lookup through the system resolver remains the default.
 - Port Scan: ports on each address are probed concurrently in batches, so a silent host costs about one timeout per batch instead of one per port; results are numbered by their position in the range and listed in address order.
 - Print: the Print button now prints the page results on the default CUPS printer (`lp`), after confirmation showing the printer name; it reports when there is nothing to print, no printer is set or `lp` is missing.
 - Documentation: one installation guide for every supported release, from the current Xubuntu/Ubuntu back to 20.04 LTS, explaining why 20.04 is the oldest supported release; the outdated separate 20.04 guide is removed.

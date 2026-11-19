@@ -33,6 +33,7 @@ from legacy_protocols import CATALOG, SCHEMES, fetch as legacy_fetch, parse_url 
 from mail_inspector import inspect_address, normalise_email, test_mail_service, MailInspectionError
 import time_services
 import service_catalog
+import dns_lookup
 import updater
 from historic_servers import HISTORIC_SERVERS, catalog_groups, get_entry, connection_fields, protocol_endpoint, access_label
 from about_documents import load_about_document, ABOUT_DOCUMENTS
@@ -619,6 +620,8 @@ class App:
         if key == 'Time_server':
             protocol = self.time_proto.get() if getattr(self, 'time_proto', None) else 'SNTP'
             return time_services.suggested_servers(protocol, historic)
+        if key == 'DNS_server':
+            return dns_lookup.SUGGESTED_SERVERS
         return service_catalog.suggestions(key)
 
     def combo_values(self, key):
@@ -936,6 +939,17 @@ class App:
                 ttk.Label(row, text='Enter ↵ to {}'.format('resolve DNS' if page == 'DNS' else 'start Trace'),
                           foreground='#547086').pack(side='left', padx=(7,0))
             ttk.Button(row,text='Delete Host',command=lambda p=page:self.delete_history(f'{p}_host')).pack(side='left',padx=(8,0))
+        if page=='DNS':
+            opt=ttk.Frame(frame);opt.pack(fill='x',pady=(3,0))
+            ttk.Label(opt,text='Record type:').pack(side='left',padx=(0,5))
+            self.dns_type=tk.StringVar(value=dns_lookup.SYSTEM_ADDRESSES)
+            ttk.Combobox(opt,textvariable=self.dns_type,values=dns_lookup.RECORD_TYPES,
+                         state='readonly',width=20).pack(side='left')
+            ttk.Label(opt,text='DNS server:').pack(side='left',padx=(14,5))
+            server=self.input_combobox(opt,page,'DNS_server',18)
+            server.pack(side='left')
+            server.bind('<Return>', lambda e: self.execute_network('DNS'))
+            ttk.Label(opt,text='empty = system resolver',foreground='#547086').pack(side='left',padx=(7,0))
         if page=='Finger':
             opt=ttk.Frame(frame);opt.pack(fill='x')
             self.full_finger=tk.BooleanVar(value=False)
@@ -988,6 +1002,10 @@ class App:
             host=self.remember(f'{page}_host')
             if not host:return
             args=(host,)
+            if page=='DNS':
+                server=self.inputs['DNS_server'].get().strip()
+                if server:self.remember('DNS_server')
+                args=(host,self.dns_type.get(),server)
         self.clear(page)
         if page in ('Ping','Trace'):
             cmd,resolve=self.build_probe_command(page,args[0])
@@ -1003,6 +1021,22 @@ class App:
         self.refresh_info()
 
     def run_text_query(self,page,args,stop,verbose=False):
+        if page=='DNS' and len(args)>1 and args[1]!=dns_lookup.SYSTEM_ADDRESSES:
+            host,record,server=args
+            types=dns_lookup.COMMON_TYPES if record==dns_lookup.ALL_COMMON else [record]
+            for rtype in types:
+                if stop.is_set():break
+                self.post(self.set_status,page,f'Querying {rtype} records for {host}...')
+                try:
+                    result=dns_lookup.query(host,rtype,server)
+                    if result['status'] not in ('NOERROR',):self.failed_tasks.add(page)
+                    self.post(self.append,page,dns_lookup.format_result(result)+'\n')
+                    if result['status']=='NXDOMAIN':break
+                except dns_lookup.DnsLookupError as e:
+                    self.failed_tasks.add(page)
+                    self.post(self.append,page,f'{e}\n')
+                    break
+            return
         if page=='DNS':
             host=args[0]
             try:
