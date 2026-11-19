@@ -43,7 +43,7 @@ APT resolves and installs required system packages from your configured Ubuntu r
 nettalabbo
 ```
 
-The package is intended for Ubuntu systems with Python 3.8 or newer, including the older Ubuntu 20.04 family. **Compatibility with every Ubuntu version has not been verified on real installations.** Ubuntu 20.04 is outside standard security support; avoid relying on it for exposed network activity without appropriate extended security maintenance.
+Nettalabbo works on the current Xubuntu and Ubuntu release and on older releases back to 20.04 LTS, where it has been tested. Releases older than 20.04 have not been tested. Ubuntu 20.04 is outside standard security support; keep it covered by extended security maintenance if you use it for network work.
 
 See [INSTALL_XUBUNTU.md](INSTALL_XUBUNTU.md) and [UPGRADE_POLICY.md](UPGRADE_POLICY.md).
 

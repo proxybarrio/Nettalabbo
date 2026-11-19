@@ -7,6 +7,7 @@ Python 3 and tkinter are required. External ping/traceroute executables are used
 from __future__ import annotations
 import concurrent.futures
 import datetime as dt
+import errno
 import ipaddress
 import json
 import os
@@ -14,6 +15,7 @@ import tempfile
 import platform
 import queue
 import re
+import selectors
 import shutil
 import socket
 import stat
@@ -63,6 +65,69 @@ def _restrict_mode(path, mode):
             path.chmod(mode)
         except OSError:
             pass
+
+
+def open_tcp_ports(host, ports, timeout, stop=None, batch=32):
+    """Return the ports of host that accept a TCP connection.
+
+    Connections are attempted concurrently in batches with non-blocking
+    sockets, so a silent host costs about one timeout per batch instead of
+    one timeout per port. At most `batch` sockets are open per call.
+    """
+    try:
+        family = socket.getaddrinfo(host, None, type=socket.SOCK_STREAM)[0][0]
+    except OSError:
+        return []
+    found = []
+    ports = list(ports)
+    for start in range(0, len(ports), batch):
+        if stop is not None and stop.is_set():
+            break
+        selector = selectors.DefaultSelector()
+        pending = {}
+        try:
+            for port in ports[start:start + batch]:
+                sock = socket.socket(family, socket.SOCK_STREAM)
+                sock.setblocking(False)
+                code = sock.connect_ex((host, port))
+                if code == 0:
+                    found.append(port)
+                    sock.close()
+                elif code in (errno.EINPROGRESS, errno.EWOULDBLOCK, errno.EAGAIN):
+                    selector.register(sock, selectors.EVENT_WRITE, port)
+                    pending[sock] = port
+                else:
+                    sock.close()
+            deadline = time.monotonic() + timeout
+            while pending:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0 or (stop is not None and stop.is_set()):
+                    break
+                for key, _events in selector.select(min(remaining, 0.25)):
+                    sock = key.fileobj
+                    if sock.getsockopt(socket.SOL_SOCKET, socket.SO_ERROR) == 0:
+                        found.append(key.data)
+                    selector.unregister(sock)
+                    sock.close()
+                    del pending[sock]
+        finally:
+            for sock in pending:
+                sock.close()
+            selector.close()
+    return sorted(found)
+
+
+def default_printer():
+    """Name of the default CUPS destination, or '' when none is set."""
+    if not shutil.which('lpstat'):
+        return ''
+    try:
+        result = subprocess.run(['lpstat', '-d'], capture_output=True, text=True, timeout=5, check=False,
+                                env={**os.environ, 'LC_ALL': 'C'})
+    except (OSError, subprocess.TimeoutExpired):
+        return ''
+    match = re.search(r'system default destination:\s*(\S+)', result.stdout)
+    return match.group(1) if match else ''
 
 
 def harden_private_paths(app_dir=None, legacy_files=None):
@@ -475,6 +540,19 @@ class App:
         tree=self.trees.get(page)
         if tree: tree.insert('', 'end', values=values)
 
+    def add_sorted_row(self, page, values):
+        """Insert keeping rows ordered by their numeric first column."""
+        tree=self.trees.get(page)
+        if not tree: return
+        position='end'
+        for index,item in enumerate(tree.get_children()):
+            try:
+                if int(tree.item(item)['values'][0])>int(values[0]):
+                    position=index;break
+            except (ValueError,TypeError,IndexError):
+                continue
+        tree.insert('', position, values=values)
+
     def output_string(self, page):
         if page == 'Domain Inspector':
             rows = [self.domain_tree.item(x)['values'] for x in self.domain_tree.get_children()]
@@ -502,7 +580,36 @@ class App:
             self.set_status(page, f'Saved: {path}')
 
     def print_output(self, page):
-        messagebox.showinfo('Print output', 'Printing is not yet implemented in the native prototype.\nUse Save Output instead.')
+        """Send the page output to the default CUPS printer with lp."""
+        content = self.output_string(page)
+        empty_table = page in self.trees and not self.trees[page].get_children()
+        if empty_table or not content or not content.strip():
+            messagebox.showinfo('Print output', 'There is nothing to print on this page yet.', parent=self.root)
+            return
+        if not shutil.which('lp'):
+            messagebox.showerror('Print output', 'The lp command was not found. Install the cups-client '
+                                 'package, or use Save Output instead.', parent=self.root)
+            return
+        printer = default_printer()
+        if not printer:
+            messagebox.showerror('Print output', 'No default printer is configured. Set one in the '
+                                 'system Printers settings, or use Save Output instead.', parent=self.root)
+            return
+        lines = content.count('\n') + 1
+        if not messagebox.askyesno('Print output', f'Print {lines} lines from {page} on {printer}?', parent=self.root):
+            return
+        self.set_status(page, f'Sending to {printer}...')
+        title = f'Nettalabbo {page}'
+        def worker():
+            try:
+                result = subprocess.run(['lp', '-t', title], input=content, text=True,
+                                        capture_output=True, timeout=30, check=False)
+                message = (result.stdout.strip() or f'Sent to {printer}') if result.returncode == 0 \
+                    else 'Printing failed: ' + (result.stderr.strip() or f'lp exit code {result.returncode}')
+            except (OSError, subprocess.TimeoutExpired) as exc:
+                message = f'Printing failed: {exc}'
+            self.post(self.set_status, page, message)
+        threading.Thread(target=worker, daemon=True, name='Nettalabbo-print').start()
 
     def suggestions_for(self, key):
         """Documented servers appended after the user's own history."""
@@ -1289,13 +1396,7 @@ class App:
             hosts=[str(ipaddress.IPv4Address(int(start)+i)) for i in range(count)]
             def check(ip):
                 if stop.is_set(): return None
-                found=[]
-                for port in ports:
-                    if stop.is_set():break
-                    try:
-                        with socket.create_connection((ip,port),timeout=timeout):
-                            found.append(str(port))
-                    except OSError:pass
+                found=[str(port) for port in open_tcp_ports(ip,ports,timeout,stop)]
                 if echo and not stop.is_set():
                     try:
                         r=subprocess.run(['ping','-n','-c','1','-W','1',ip],
@@ -1315,12 +1416,13 @@ class App:
                         labels.append(f'{s} ({names[0]})' if names else s)
                 return(ip,hostname,', '.join(labels))
             with concurrent.futures.ThreadPoolExecutor(max_workers=16) as pool:
-                futs={pool.submit(check,ip):ip for ip in hosts}
-                for idx,future in enumerate(concurrent.futures.as_completed(futs)):
+                futs={pool.submit(check,ip):number for number,ip in enumerate(hosts,1)}
+                for done,future in enumerate(concurrent.futures.as_completed(futs),1):
                     if stop.is_set():break
                     result=future.result()
-                    if result:self.post(self.add_row,page,(idx+1,)+result)
-                    if idx%8==0:self.post(self.set_status,page,f'Checked {idx+1}/{count} addresses')
+                    # Number by position in the range, insert in address order.
+                    if result:self.post(self.add_sorted_row,page,(futs[future],)+result)
+                    if done%8==0 or done==count:self.post(self.set_status,page,f'Checked {done}/{count} addresses')
         self.start(page,worker)
 
     def make_remote_page(self, page):
