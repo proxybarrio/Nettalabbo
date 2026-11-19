@@ -22,6 +22,9 @@
   </categories>
   <provides><binary>nettalabbo</binary></provides>
   <releases>
+    <release version="0.5.4" date="2026-11-19">
+      <description><p>Domain and mail Diagnose, explicit consent for external reputation and SMTP checks, ANSI colours in remote terminals and selectable Legacy Navigator palettes.</p></description>
+    </release>
     <release version="0.5.3" date="2026-11-18">
       <description>
         <p>Clickable hyperlinks in alternative-network documents, including links found inside plain text responses; links are shown in the Links menu.</p>
