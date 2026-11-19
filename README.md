@@ -2,7 +2,7 @@
 
 **Network Laboratory app for Xubuntu and other Ubuntu systems**
 
-**Current development version:** 0.5.4 (Debian packaging revision 1, release candidate)  
+**Current version:** 0.5.4 (Debian packaging revision 1)  
 **Status:** experimental / active testing  
 **Platform:** Xubuntu and other Ubuntu-based Linux systems  
 **Written by:** Proxybarrio, with AI-assisted development  
@@ -47,7 +47,7 @@ Nettalabbo works on the current Xubuntu and Ubuntu release and on older releases
 
 See [INSTALL_XUBUNTU.md](INSTALL_XUBUNTU.md) and [UPGRADE_POLICY.md](UPGRADE_POLICY.md).
 
-## New in 0.5.4 (development branch)
+## New in 0.5.4
 
 - **Diagnose:** DNS and mail configuration assessment (MX, SPF, DMARC, DKIM selector, MTA STS, TLS RPT). Optional SMTP connectivity and domain/IP DNSBL queries require consent. DNSBL access errors and indeterminate responses are not treated as clean reputation; a successful result does not guarantee email delivery.
 - **SSH and Telnet:** ANSI colour presentation and additional limits for hostile cursor sequences; this is **not** a full xterm emulator.

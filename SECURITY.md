@@ -18,7 +18,9 @@ The application may retain past domains, addresses and protocol URLs in local
 history. Do not place access tokens or passwords in URLs. Previously saved
 files under the former application names are not automatically erased.
 
-In Diagnose, DNS queries are made only when the user explicitly runs the check. Optional SMTP and DNSBL probes are disabled by default. Enabling DNSBL submits the selected domain and public MX server addresses to external DNS blacklist providers, which may log queries or reject unsupported resolver networks. A DNSBL response, including an empty response, does not guarantee a clean reputation; access and policy errors are reported as unknown. SPF, DKIM, DMARC and TLS results are limited diagnostics rather than proof of email delivery.\n\nNetwork and protocol inputs originate from remote peers and are untrusted. The
+In Diagnose, DNS queries are made only when the user explicitly runs the check. Optional SMTP and DNSBL probes are disabled by default. Enabling DNSBL submits the selected domain and public MX server addresses to external DNS blacklist providers, which may log queries or reject unsupported resolver networks. A DNSBL response, including an empty response, does not guarantee a clean reputation; access and policy errors are reported as unknown. SPF, DKIM, DMARC and TLS results are limited diagnostics rather than proof of email delivery.
+
+Network and protocol inputs originate from remote peers and are untrusted. The
 legacy clients are experimental, not formally audited. The included SSH console
 is a basic terminal emulator rather than a full VT implementation. Do not use
 this testing release for privileged or sensitive remote administration.

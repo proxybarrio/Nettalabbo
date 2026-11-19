@@ -6,6 +6,8 @@ import re
 
 def txt_value(value):
     """Join quoted character strings within one TXT resource record."""
+    if '"' not in value:
+        return value.strip()  # already a single unquoted string
     parts = re.findall(r'"(?:[^"\\]|\\.)*"|\S+', value)
     return ''.join(part[1:-1].replace('\\\"', '"') if part.startswith('"') and part.endswith('"') else part for part in parts)
 
@@ -21,7 +23,16 @@ def spf_review(records):
     all_terms = 0
     for token in terms[1:]:
         base = token.lstrip('+-~?').lower()
-        key = base.split(':', 1)[0].split('=', 1)[0]
+        if '=' in base.split(':', 1)[0]:
+            key = base.split('=', 1)[0]
+            if key not in ('redirect', 'exp'):
+                # RFC 7208 section 6: unknown modifiers MUST be ignored.
+                if re.fullmatch(r'[a-z][a-z0-9_.-]*', key):
+                    continue
+                return ('warn', 'Malformed SPF modifier: ' + token[:50])
+        else:
+            # Mechanism name ends at ':' (domain) or '/' (CIDR length), e.g. a/24, mx:host/24.
+            key = re.split(r'[:/]', base, 1)[0]
         if key == 'redirect':
             redirects += 1
             lookups += 1

@@ -2,7 +2,8 @@ name: Nettalabbo verification
 on:
   push:
     branches:
-      - feature/legacy-colour-themes
+      - main
+      - 'feature/**'
   pull_request:
     branches:
       - main

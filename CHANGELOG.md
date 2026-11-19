@@ -1,9 +1,11 @@
-## 0.5.4 Debian revision 1 (development candidate, 19 November 2026)
+## 0.5.4 Debian revision 1 (19 November 2026)
 
 - Diagnose: DNS and mail checks for A, AAAA, MX, SPF, DMARC, optional DKIM selector, MTA STS and TLS RPT; SMTP connectivity and DNSBL require explicit opt in.
 - Mail policy review distinguishes publication from verification; duplicate/invalid policies and provider access errors receive explicit statuses.
 - SSH and Telnet: ANSI 16/256/true-colour rendering; cursor and scrollback hardening. A complete terminal emulator is not claimed.
 - Legacy Navigator: Classic, Dark and Monochrome palettes without changing links, Back/Forward/Home/Stop or Raw view.
+- Updates: a redirect away from GitHub is now rejected before any request is sent to the new host, not only checked afterwards.
+- Diagnose: SPF review accepts CIDR lengths on `a` and `mx` (for example `a/24`, `mx:host/24`) and ignores unknown modifiers as RFC 7208 requires; TXT values without quotes are read correctly.
 - Added regression tests and verification workflow for the new components. Live network, SMTP, DNSBL and Xubuntu installation checks are still required before public release.
 
 ## 0.5.3 Debian revision 9 (19 November 2026)

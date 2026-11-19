@@ -1539,7 +1539,9 @@ class App:
         ttk.Label(form, text='Domain:').pack(side='left', padx=(0, 5))
         domain = tk.StringVar()
         self.inputs['Diagnose_domain'] = domain
-        ttk.Entry(form, textvariable=domain, width=34).pack(side='left', padx=(0, 12))
+        domain_entry = ttk.Entry(form, textvariable=domain, width=34)
+        domain_entry.pack(side='left', padx=(0, 12))
+        domain_entry.bind('<Return>', lambda e: self.execute_diagnose())
         ttk.Label(form, text='DKIM selector:').pack(side='left')
         self.diagnose_selector = tk.StringVar()
         ttk.Entry(form, textvariable=self.diagnose_selector, width=15).pack(side='left', padx=(6, 0))
