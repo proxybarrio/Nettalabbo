@@ -6,7 +6,7 @@ From the directory containing the downloaded package:
 
 ```bash
 sudo apt update
-sudo apt install ./nettalabbo_0.5.3-7_all.deb
+sudo apt install ./nettalabbo_0.5.3-8_all.deb
 ```
 
 APT uses the mandatory `Depends` in the `.deb` to resolve and install required packages before Nettalabbo can be configured. Internet access and compatible configured Ubuntu repositories may be necessary. The package does not download arbitrary tools from third-party websites.
