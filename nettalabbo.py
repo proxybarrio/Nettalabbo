@@ -29,6 +29,8 @@ from pathlib import Path
 from tkinter import filedialog, messagebox, ttk, simpledialog
 from domain_rdap import lookup_domain, LookupError, normalise_domain
 from remote_terminal import PtySession, TerminalScreen, connection_command
+from terminal_colours import ColourTerminalScreen
+from diagnose import diagnose as run_domain_diagnose
 from legacy_protocols import CATALOG, SCHEMES, fetch as legacy_fetch, parse_url as parse_legacy_url, TrustRequired, LegacyError, titan_upload
 from mail_inspector import inspect_address, normalise_email, test_mail_service, MailInspectionError
 import time_services
@@ -157,7 +159,7 @@ def harden_private_paths(app_dir=None, legacy_files=None):
 SECTIONS = {
     'Start': ['Overview'],
     'Domain research': ['Domain Inspector', 'DNS', 'WhoIs'],
-    'Mail systems': ['Mail Inspector'],
+    'Mail systems': ['Mail Inspector', 'Diagnose'],
     'Network checks': ['Ping', 'Trace', 'Scanner'],
     'Remote access': ['SSH', 'Telnet'],
     'Classic services': ['Finger', 'Time', 'Quote'],
@@ -167,7 +169,7 @@ SECTIONS = {
 PAGE_LABELS = {
     'Overview': 'Welcome', 'Domain Inspector': 'Domain Inspector',
     'Legacy Navigator': 'Legacy Stuff',
-    'Mail Inspector': 'Mail Server Inspector',
+    'Mail Inspector': 'Mail Server Inspector', 'Diagnose': 'Domain and Mail Diagnose',
     'WhoIs': 'WhoIs', 'Trace': 'Trace',
     'Scanner': 'Port Scan', 'Info': 'Info',
     'Options': 'Options', 'About': 'About Nettalabbo',
@@ -176,6 +178,7 @@ PAGE_DESCRIPTIONS = {
     'Overview': 'A practical workspace for understanding networks, domains and remote hosts.',
     'Legacy Navigator': 'Browse classic networks through clickable, underlined links. Switch between rendered and raw protocol views.',
     'Mail Inspector': 'Inspect MX routing, optional single-address SMTP acceptance, and POP3/IMAP/SMTP connectivity.',
+    'Diagnose': 'Inspect DNS, MX, SPF, DMARC, DKIM and opt-in DNS blacklists.',
     'Domain Inspector': 'Identify a public domain registry, then request available registration information.',
     'DNS': 'Resolve domain names and inspect addresses.',
     'WhoIs': 'Query a chosen WHOIS server directly, or use Domain Inspector for automatic discovery.',
@@ -316,6 +319,7 @@ class App:
         self.make_overview_page()
         self.make_domain_page()
         self.make_mail_page()
+        self.make_diagnose_page()
         for name in ['Finger', 'WhoIs', 'Quote', 'DNS', 'Ping', 'Trace']:
             self.make_network_page(name)
         self.make_time_page()
@@ -1464,7 +1468,7 @@ class App:
         """One in-app interactive SSH or Telnet connection per protocol tab."""
         f = self.pages[page]
         self.remote_sessions[page] = None
-        self.remote_screens[page] = TerminalScreen()
+        self.remote_screens[page] = ColourTerminalScreen()
         form = ttk.Frame(f)
         form.pack(fill='x', pady=(0, 7))
         form.columnconfigure(1, weight=2)
@@ -1520,6 +1524,61 @@ class App:
             self.remote_write(page, 'Authentication and host-key verification are handled by OpenSSH.\n')
         else:
             self.remote_write(page, 'Unencrypted protocol: avoid transmitting passwords or private information.\n')
+
+    def make_diagnose_page(self):
+        """Read-only domain/mail diagnostics; optional DNSBL is opt-in."""
+        page = 'Diagnose'
+        frame = self.pages[page]
+        ttk.Label(frame, text='Domain and Mail Diagnose',
+                  font=('Sans', 14, 'bold')).pack(anchor='w')
+        ttk.Label(frame, text='DNS, MX, SPF, DMARC, optional DKIM and DNS blacklists. '
+                  'Results are diagnostic, not deliverability guarantees.',
+                  wraplength=750).pack(anchor='w', pady=(3, 9))
+        form = ttk.Frame(frame)
+        form.pack(fill='x', pady=(0, 8))
+        ttk.Label(form, text='Domain:').pack(side='left', padx=(0, 5))
+        domain = tk.StringVar()
+        self.inputs['Diagnose_domain'] = domain
+        ttk.Entry(form, textvariable=domain, width=34).pack(side='left', padx=(0, 12))
+        ttk.Label(form, text='DKIM selector:').pack(side='left')
+        self.diagnose_selector = tk.StringVar()
+        ttk.Entry(form, textvariable=self.diagnose_selector, width=15).pack(side='left', padx=(6, 0))
+        self.diagnose_dnsbl = tk.BooleanVar(value=False)
+        ttk.Checkbutton(frame, text='Query third-party DNS blacklists (discloses domain and public IPs)',
+                        variable=self.diagnose_dnsbl).pack(anchor='w', pady=(0, 6))
+        ttk.Label(frame, text='DNSBL policy and resolver limits can make results inconclusive. '
+                  'No SMTP recipient verification is performed.',
+                  wraplength=750).pack(anchor='w', pady=(0, 8))
+        ttk.Button(frame, text='Run Diagnose', command=self.execute_diagnose).pack(anchor='w')
+        self.status[page] = tk.StringVar(value='Ready. No queries run automatically.')
+        ttk.Label(frame, textvariable=self.status[page]).pack(anchor='w', pady=(7, 0))
+        self.text_output(frame, page)
+
+    def execute_diagnose(self):
+        page = 'Diagnose'
+        domain = self.inputs['Diagnose_domain'].get().strip()
+        selector = self.diagnose_selector.get().strip()
+        reputation = bool(self.diagnose_dnsbl.get())
+        if reputation and not messagebox.askyesno(
+                'External DNS blacklist queries',
+                'DNSBL operators will receive queries containing the domain '
+                'and public mail server IP addresses. Continue?', parent=self.root):
+            return
+        self.clear(page)
+        def worker(stop):
+            if stop.is_set():
+                return
+            try:
+                report = run_domain_diagnose(domain, check_blacklists=reputation,
+                                             dkim_selector=selector)
+                if not stop.is_set():
+                    self.post(self.append, page, report.as_text() + '\n')
+                    self.post(self.set_status, page, 'Diagnostic checks completed.')
+            except Exception as exc:
+                if not stop.is_set():
+                    self.post(self.append, page, 'Diagnose failed: ' + str(exc) + '\n')
+                    self.post(self.set_status, page, 'Diagnostic checks failed.')
+        self.start(page, worker)
 
     def historic_servers_dialog(self, initial_page='Telnet'):
         """Present SSH and Telnet independently for every historic catalog item.
@@ -1678,6 +1737,27 @@ class App:
         console.configure(state='normal')
         console.delete('1.0', 'end')
         console.insert('1.0', content)
+        # Remote SGR modifies presentation only, not executable UI commands.
+        for name in console.tag_names():
+            if name.startswith('ansi_style_'):
+                console.tag_delete(name)
+        tags = {}
+        for line, start, end, style in self.remote_screens[page].styled_runs():
+            fg, bg, bold, underline, reverse = style
+            if reverse:
+                fg, bg = bg or '#15202b', fg or '#e9eef5'
+            if style not in tags:
+                if len(tags) >= 256:
+                    continue
+                name = 'ansi_style_' + str(len(tags))
+                opts = {}
+                if fg: opts['foreground'] = fg
+                if bg: opts['background'] = bg
+                if underline: opts['underline'] = 1
+                if bold: opts['font'] = ('DejaVu Sans Mono', 10, 'bold')
+                console.tag_configure(name, **opts)
+                tags[style] = name
+            console.tag_add(tags[style], f'{line}.{start}', f'{line}.{end}')
         if first and last:
             try: console.tag_add('sel', first, last)
             except tk.TclError: pass
