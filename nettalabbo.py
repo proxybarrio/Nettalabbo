@@ -18,6 +18,7 @@ import shutil
 import socket
 import stat
 import struct
+import sys
 import subprocess
 import threading
 import time
@@ -28,6 +29,9 @@ from domain_rdap import lookup_domain, LookupError, normalise_domain
 from remote_terminal import PtySession, TerminalScreen, connection_command
 from legacy_protocols import CATALOG, SCHEMES, fetch as legacy_fetch, parse_url as parse_legacy_url, TrustRequired, LegacyError, titan_upload
 from mail_inspector import inspect_address, normalise_email, test_mail_service, MailInspectionError
+import time_services
+import service_catalog
+import updater
 from historic_servers import HISTORIC_SERVERS, catalog_groups, get_entry, connection_fields, protocol_endpoint, access_label
 from about_documents import load_about_document, ABOUT_DOCUMENTS
 from legacy_view import segments as legacy_segments, raw_text as legacy_raw_text, link_color as legacy_link_color, distinct_links as legacy_distinct_links
@@ -35,6 +39,7 @@ from urllib.parse import urlsplit, urlunsplit, quote as url_quote
 import webbrowser
 
 VERSION = '0.5.3'
+PACKAGE_VERSION = '0.5.3-9'  # must match packaging/control
 APP_DIR = Path.home() / '.config' / 'nettalabbo'
 ASSETS_DIR = Path(__file__).resolve().parent / 'assets'
 LEGACY_SETTINGS_FILES = [
@@ -266,6 +271,8 @@ class App:
         if chosen not in TABS: chosen = 'Overview'
         self.select_page(chosen)
         self.root.after(75, self.pump)
+        self.update_busy = False
+        self.root.after(4000, self.auto_update_check)
 
     @staticmethod
     def load_image(size):
@@ -497,10 +504,24 @@ class App:
     def print_output(self, page):
         messagebox.showinfo('Print output', 'Printing is not yet implemented in the native prototype.\nUse Save Output instead.')
 
+    def suggestions_for(self, key):
+        """Documented servers appended after the user's own history."""
+        historic = bool(getattr(self, 'time_historic', None) and self.time_historic.get())
+        if key == 'Time_dayhost':
+            return time_services.suggested_servers('Daytime', historic)
+        if key == 'Time_server':
+            protocol = self.time_proto.get() if getattr(self, 'time_proto', None) else 'SNTP'
+            return time_services.suggested_servers(protocol, historic)
+        return service_catalog.suggestions(key)
+
+    def combo_values(self, key):
+        values = list(self.settings.get('history', {}).get(key, []))
+        values += [host for host in self.suggestions_for(key) if host not in values]
+        return values
+
     def input_combobox(self, parent, page, key, width=36):
-        h = self.settings.get('history', {}).get(key, [])
         v=tk.StringVar()
-        combo=ttk.Combobox(parent, textvariable=v, values=h, width=width)
+        combo=ttk.Combobox(parent, textvariable=v, values=self.combo_values(key), width=width)
         self.inputs[key]=v; self.history_boxes[key]=combo
         return combo
 
@@ -511,7 +532,7 @@ class App:
         if value in hist: hist.remove(value)
         hist.insert(0,value)
         del hist[30:]
-        self.history_boxes[key]['values']=hist
+        self.history_boxes[key]['values']=self.combo_values(key)
         self.persist()
         return value
 
@@ -520,7 +541,7 @@ class App:
         h=self.settings.setdefault('history', {}).setdefault(key, [])
         if v in h: h.remove(v)
         self.inputs[key].set('')
-        self.history_boxes[key]['values']=h
+        self.history_boxes[key]['values']=self.combo_values(key)
         self.persist()
 
     def button_bar(self, parent, page, command, main_label):
@@ -803,6 +824,7 @@ class App:
             entry = self.input_combobox(row,page,f'{page}_host',37)
             entry.pack(side='left',fill='x',expand=True)
             entry.bind('<Return>', lambda e, p=page: self.execute_network(p))
+            if page=='Quote' and not self.inputs['Quote_host'].get():self.inputs['Quote_host'].set('djxmmx.net')
             if page in ('DNS','Trace'):
                 ttk.Label(row, text='Enter ↵ to {}'.format('resolve DNS' if page == 'DNS' else 'start Trace'),
                           foreground='#547086').pack(side='left', padx=(7,0))
@@ -901,20 +923,34 @@ class App:
         elif page=='Quote':host=args[0];port=17;payload=''
         else:return
         try:
-            with socket.create_connection((host,port),timeout=7) as sock:
-                sock.settimeout(5)
-                if payload:sock.sendall(payload.encode('utf-8','replace'))
-                chunks=[]
-                while not stop.is_set():
-                    try:chunk=sock.recv(4096)
-                    except socket.timeout: break
-                    if not chunk: break
-                    chunks.append(chunk)
-                    if sum(map(len,chunks))>1024*1024:
-                        chunks.append(b'\n[Output limited to 1 MiB]');break
-                self.post(self.append,page,b''.join(chunks).decode('utf-8','replace') or '[No data returned]\n')
+            text=self.tcp_text(host,port,payload,stop)
+            self.post(self.append,page,text or '[No data returned]\n')
+            if page=='WhoIs' and host.lower()=='whois.iana.org':
+                referral=service_catalog.whois_referral(text)
+                if referral and referral!=host.lower() and not stop.is_set():
+                    self.post(self.append,page,f'\n--- IANA refers to {referral}; querying it ---\n\n')
+                    try:
+                        self.post(self.append,page,self.tcp_text(referral,43,payload,stop) or '[No data returned]\n')
+                    except OSError as e:
+                        self.post(self.append,page,f'Referral to {referral} failed: {e}\n')
         except OSError as e:
             self.post(self.append,page,f'Connection failed: {e}\n')
+
+    @staticmethod
+    def tcp_text(host,port,payload,stop):
+        """Send an optional request line and read the reply until close (max 1 MiB)."""
+        with socket.create_connection((host,port),timeout=7) as sock:
+            sock.settimeout(5)
+            if payload:sock.sendall(payload.encode('utf-8','replace'))
+            chunks=[]
+            while not stop.is_set():
+                try:chunk=sock.recv(4096)
+                except socket.timeout: break
+                if not chunk: break
+                chunks.append(chunk)
+                if sum(map(len,chunks))>1024*1024:
+                    chunks.append(b'\n[Output limited to 1 MiB]');break
+        return b''.join(chunks).decode('utf-8','replace')
 
     @staticmethod
     def traceroute_supports(flag):
@@ -1118,18 +1154,38 @@ class App:
         day=ttk.LabelFrame(frame,text='Daytime');day.pack(fill='x',pady=3)
         row=ttk.Frame(day);row.pack(fill='x',padx=7,pady=5)
         ttk.Label(row,text='Remote host:').pack(side='left',padx=(0,7))
-        self.input_combobox(row,page,'Time_dayhost').pack(side='left',fill='x',expand=True)
+        dayhost=self.input_combobox(row,page,'Time_dayhost')
+        dayhost.pack(side='left',fill='x',expand=True)
+        self.time_suggestions(dayhost,'Time_dayhost','Daytime')
+        if not self.inputs['Time_dayhost'].get():self.inputs['Time_dayhost'].set('time.inrim.it')
         ttk.Button(row,text='DayTime',command=self.query_daytime).pack(side='left',padx=7)
         ttk.Button(row,text='Cancel',command=lambda:self.cancel(page)).pack(side='left')
         sync=ttk.LabelFrame(frame,text='Clock Synchronization');sync.pack(fill='x',pady=(8,3))
         row=ttk.Frame(sync);row.pack(fill='x',padx=7,pady=7)
         ttk.Label(row,text='Time server:').pack(side='left',padx=(0,7))
-        self.input_combobox(row,page,'Time_server').pack(side='left',fill='x',expand=True)
-        if not self.inputs['Time_server'].get():self.inputs['Time_server'].set('time.google.com')
+        server=self.input_combobox(row,page,'Time_server')
+        server.pack(side='left',fill='x',expand=True)
+        if not self.inputs['Time_server'].get():self.inputs['Time_server'].set('time.inrim.it')
         self.time_proto=tk.StringVar(value='SNTP')
         for value in ('TCP','UDP','SNTP'):
-            ttk.Radiobutton(row,text=value,value=value,variable=self.time_proto).pack(side='left',padx=5)
-        bottom=ttk.Frame(sync);bottom.pack(fill='x',padx=7,pady=(0,7))
+            ttk.Radiobutton(row,text=value,value=value,variable=self.time_proto,
+                            command=lambda c=server:self.time_suggestions(c,'Time_server',self.time_proto.get())
+                            ).pack(side='left',padx=5)
+        self.time_suggestions(server,'Time_server','SNTP')
+        options=ttk.Frame(sync);options.pack(fill='x',padx=7)
+        self.time_fallback=tk.BooleanVar(value=True)
+        ttk.Checkbutton(options,text='If the server does not respond, try the other listed servers',
+                        variable=self.time_fallback).pack(side='left')
+        self.time_historic=tk.BooleanVar(value=False)
+        ttk.Checkbutton(options,text='Include historic servers',variable=self.time_historic,
+                        command=lambda:(self.time_suggestions(dayhost,'Time_dayhost'),
+                                        self.time_suggestions(server,'Time_server'))
+                        ).pack(side='left',padx=(12,0))
+        self.time_note=tk.StringVar(value='')
+        ttk.Label(sync,textvariable=self.time_note,foreground='#547086').pack(anchor='w',padx=7,pady=(3,0))
+        for combo,key in ((dayhost,'Time_dayhost'),(server,'Time_server')):
+            combo.bind('<<ComboboxSelected>>',lambda e,k=key:self.time_note.set(time_services.server_note(self.inputs[k].get())))
+        bottom=ttk.Frame(sync);bottom.pack(fill='x',padx=7,pady=(4,7))
         ttk.Button(bottom,text='Check remote time',command=self.query_clock).pack(side='left')
         ttk.Button(bottom,text='Cancel',command=lambda:self.cancel(page)).pack(side='left',padx=7)
         ttk.Label(bottom,text='Read only: never changes your system clock').pack(side='left',padx=12)
@@ -1137,51 +1193,41 @@ class App:
         ttk.Label(frame,textvariable=self.status[page]).pack(anchor='w',pady=(5,0))
         self.text_output(frame,page)
 
-    def query_daytime(self):
-        page='Time';host=self.remember('Time_dayhost')
-        if not host:return
+    def time_suggestions(self,combo,key,protocol=None):
+        combo['values']=self.combo_values(key)
+
+    def run_time_query(self,protocol,host):
+        page='Time'
+        fallback=self.time_fallback.get()
+        historic=self.time_historic.get()
         self.clear(page)
         def worker(stop):
+            def attempt(name):
+                self.post(self.set_status,page,f'Querying {name} ({protocol})...')
             try:
-                with socket.create_connection((host,13),timeout=5) as sock:
-                    sock.settimeout(5);data=sock.recv(4096)
-                self.post(self.append,page,data.decode('ascii','replace'))
-            except OSError as e:self.post(self.append,page,f'Daytime failed: {e}\n')
+                if fallback:
+                    result,attempts=time_services.query_with_fallback(protocol,host,stop,historic,attempt)
+                    for name,error in attempts:
+                        if error:self.post(self.append,page,f'{name}: no answer ({error})\n')
+                    if len(attempts)>1:self.post(self.append,page,'\n')
+                else:
+                    attempt(host)
+                    result=time_services.query(protocol,host)
+                text=time_services.format_result(result)
+                if protocol!='Daytime':text+='\nSystem clock was NOT modified.\n'
+                self.post(self.append,page,text)
+            except (time_services.TimeServiceError,OSError,ValueError,OverflowError) as e:
+                self.failed_tasks.add(page)
+                self.post(self.append,page,f'{protocol} query failed: {e}\n')
         self.start(page,worker)
 
+    def query_daytime(self):
+        host=self.remember('Time_dayhost')
+        if host:self.run_time_query('Daytime',host)
+
     def query_clock(self):
-        page='Time';host=self.remember('Time_server')
-        if not host:return
-        mode=self.time_proto.get()
-        self.clear(page)
-        def worker(stop):
-            try:
-                if mode=='SNTP':
-                    with socket.socket(socket.AF_INET,socket.SOCK_DGRAM) as s:
-                        s.settimeout(4);s.sendto(b'\x1b'+47*b'\0',(host,123))
-                        resp,_=s.recvfrom(512)
-                    if len(resp)<48:raise ValueError('Incomplete SNTP response')
-                    seconds=struct.unpack('!I',resp[40:44])[0]-2208988800
-                    remote=dt.datetime.fromtimestamp(seconds,dt.timezone.utc)
-                    local=dt.datetime.now(dt.timezone.utc)
-                    msg=f'SNTP time (UTC): {remote.isoformat()}\nLocal UTC time: {local.isoformat()}\nApproximate difference: {(remote-local).total_seconds():.3f} s\n'
-                elif mode=='TCP':
-                    with socket.create_connection((host,37),timeout=5) as s:
-                        s.settimeout(5);raw=s.recv(4)
-                    if len(raw)!=4:raise ValueError('Incomplete RFC 868 time response')
-                    secs=struct.unpack('!I',raw)[0]-2208988800
-                    msg=f'TCP Time (UTC): {dt.datetime.fromtimestamp(secs,dt.timezone.utc).isoformat()}\n'
-                else:
-                    with socket.socket(socket.AF_INET,socket.SOCK_DGRAM) as s:
-                        s.settimeout(5);s.sendto(b'\0',(host,37));raw,_=s.recvfrom(8)
-                    if len(raw)<4:raise ValueError('Incomplete time response')
-                    secs=struct.unpack('!I',raw[:4])[0]-2208988800
-                    msg=f'UDP Time (UTC): {dt.datetime.fromtimestamp(secs,dt.timezone.utc).isoformat()}\n'
-                msg+='\nSystem clock was NOT modified.\n'
-                self.post(self.append,page,msg)
-            except (OSError,ValueError,OverflowError) as e:
-                self.post(self.append,page,f'Time query failed: {e}\n')
-        self.start(page,worker)
+        host=self.remember('Time_server')
+        if host:self.run_time_query(self.time_proto.get(),host)
 
     def make_scanner_page(self):
         page='Scanner';f=self.pages[page]
@@ -2166,7 +2212,7 @@ class App:
         ttk.Label(identity, text='Nettalabbo', font=('Sans', 19, 'bold')).pack(anchor='w', pady=(8, 4))
         ttk.Label(identity, text='Network Laboratory app for Xubuntu and other Ubuntu systems',
                   font=('Sans', 10)).pack(anchor='w', pady=(0, 6))
-        ttk.Label(identity, text=f'Version {VERSION}  ·  MIT License',
+        ttk.Label(identity, text=f'Version {VERSION} (package {PACKAGE_VERSION})  ·  MIT License',
                   font=('Sans', 10)).pack(anchor='w', pady=(0, 6))
         ttk.Label(identity, text='Created by Proxybarrio, with AI-assisted development.',
                   font=('Sans', 10, 'bold')).pack(anchor='w', pady=(0, 5))
@@ -2181,6 +2227,16 @@ class App:
                        command=lambda item=key: self.show_about_document(item)).pack(anchor='center', pady=5)
         ttk.Button(f, text='Read full MIT License', width=43,
                    command=lambda: self.show_about_document('licence')).pack(anchor='center', pady=(5, 13))
+        updates = ttk.Frame(f)
+        updates.pack(anchor='center', pady=(0, 10))
+        ttk.Button(updates, text='Check for updates', width=20,
+                   command=lambda: self.check_for_updates(manual=True)).pack(side='left')
+        prefs = self.settings.get('updates', {})
+        self.update_auto = tk.BooleanVar(value=bool(prefs.get('auto')))
+        ttk.Checkbutton(updates, text='Check automatically once a day', variable=self.update_auto,
+                        command=self.set_update_auto).pack(side='left', padx=(12, 0))
+        self.update_status = tk.StringVar(value='')
+        ttk.Label(f, textvariable=self.update_status, foreground='#547086').pack(anchor='center', pady=(0, 8))
         ttk.Separator(f, orient='horizontal').pack(fill='x', padx=30, pady=(0, 11))
         ttk.Label(f, text='TEST RELEASE  •  ACTIVE DEVELOPMENT',
                   font=('Sans', 11, 'bold'), foreground='#975319').pack(anchor='center', pady=(0, 5))
@@ -2190,6 +2246,125 @@ class App:
                   justify='center').pack(anchor='center', pady=(0, 5))
         # Historic acknowledgement: NetLab95 was developed by Alexander Danileiko.
         # Nettalabbo is not a port or an official continuation of that software.
+
+    # --- Updates from GitHub Releases ---
+
+    def update_prefs(self):
+        return self.settings.setdefault('updates', {})
+
+    def set_update_auto(self):
+        self.update_prefs()['auto'] = bool(self.update_auto.get())
+        self.persist()
+
+    def auto_update_check(self):
+        if not updater.running_from_package(__file__):
+            return  # source checkout: updates come from git, not from packages
+        prefs = self.update_prefs()
+        if prefs.get('auto') is None:
+            allowed = messagebox.askyesno(
+                'Nettalabbo updates',
+                'Allow Nettalabbo to check GitHub once a day for a new version?\n\n'
+                'Only the GitHub release page is contacted. A new version is downloaded '
+                'and verified automatically; it is installed only after you confirm '
+                'and enter your password.\n\nYou can change this later in About.',
+                parent=self.root)
+            prefs['auto'] = allowed
+            if hasattr(self, 'update_auto'): self.update_auto.set(allowed)
+            self.persist()
+        if prefs.get('auto') and time.time() - prefs.get('last_check', 0) > updater.CHECK_INTERVAL:
+            self.check_for_updates(manual=False)
+
+    def report_update(self, text, manual):
+        if hasattr(self, 'update_status'): self.update_status.set(text)
+        self.footer_status.set(text)
+        if manual: messagebox.showinfo('Nettalabbo updates', text, parent=self.root)
+
+    def check_for_updates(self, manual=False):
+        if self.update_busy:
+            if manual: messagebox.showinfo('Nettalabbo updates', 'An update check is already running.', parent=self.root)
+            return
+        self.update_busy = True
+        current = updater.installed_version(PACKAGE_VERSION)
+        from_package = updater.running_from_package(__file__)
+        skipped = self.update_prefs().get('skipped')
+        if hasattr(self, 'update_status'): self.update_status.set('Checking GitHub for updates...')
+        def worker():
+            try:
+                release = updater.check(current)
+                self.post(lambda: self.update_prefs().__setitem__('last_check', time.time()))
+                if release is None:
+                    self.post(self.report_update, f'Nettalabbo {current} is up to date.', manual)
+                elif not from_package:
+                    self.post(self.report_update, f'Version {release["version"]} is available. This copy runs from '
+                              'source: update it with git pull, or install the .deb from GitHub.', manual)
+                elif release['version'] == skipped and not manual:
+                    self.post(self.report_update, f'Version {release["version"]} skipped at your request.', False)
+                else:
+                    self.post(self.footer_status.set, f'Downloading Nettalabbo {release["version"]}...')
+                    path = updater.download(release)
+                    self.post(self.offer_update, release, path)
+            except updater.UpdateError as exc:
+                self.post(self.report_update, f'Update check: {exc}', manual)
+            except Exception as exc:
+                self.post(self.report_update, f'Update check failed: {exc}', manual)
+            finally:
+                self.post(setattr, self, 'update_busy', False)
+                self.post(self.persist)
+        threading.Thread(target=worker, daemon=True, name='Nettalabbo-update').start()
+
+    def offer_update(self, release, path):
+        window = tk.Toplevel(self.root)
+        window.title('Nettalabbo update')
+        window.transient(self.root)
+        frame = ttk.Frame(window, padding=16)
+        frame.pack(fill='both', expand=True)
+        ttk.Label(frame, text=f'Nettalabbo {release["version"]} is ready to install',
+                  font=('Sans', 13, 'bold')).pack(anchor='w')
+        ttk.Label(frame, text='Downloaded from GitHub and verified (SHA-256 checksum and package data).\n'
+                              'Installing asks for your password; Nettalabbo then restarts.',
+                  justify='left').pack(anchor='w', pady=(6, 8))
+        if release.get('notes'):
+            notes = tk.Text(frame, height=10, width=72, wrap='word', relief='flat', background='#f7fbfe')
+            notes.insert('1.0', release['notes'])
+            notes.configure(state='disabled')
+            notes.pack(fill='both', expand=True, pady=(0, 8))
+        buttons = ttk.Frame(frame)
+        buttons.pack(fill='x')
+        def later():
+            window.destroy()
+        def skip():
+            self.update_prefs()['skipped'] = release['version']
+            self.persist()
+            updater.discard(path)
+            window.destroy()
+        def install():
+            window.destroy()
+            self.install_update(release, path)
+        ttk.Button(buttons, text='Install now', command=install).pack(side='left')
+        ttk.Button(buttons, text='Later', command=later).pack(side='left', padx=7)
+        ttk.Button(buttons, text='Skip this version', command=skip).pack(side='left')
+
+    def install_update(self, release, path):
+        self.footer_status.set(f'Installing Nettalabbo {release["version"]}...')
+        def worker():
+            try:
+                updater.install(path)
+                self.post(self.update_installed, release)
+            except (updater.UpdateError, OSError, subprocess.TimeoutExpired) as exc:
+                self.post(self.report_update, f'Update not installed: {exc}', True)
+        threading.Thread(target=worker, daemon=True, name='Nettalabbo-install').start()
+
+    def update_installed(self, release):
+        self.update_prefs().pop('skipped', None)
+        self.persist()
+        if messagebox.askyesno('Nettalabbo updated',
+                               f'Nettalabbo {release["version"]} is installed. Restart now?',
+                               parent=self.root):
+            self.close()
+            script = updater.INSTALL_DIR / 'nettalabbo.py'
+            os.execv(sys.executable, [sys.executable, str(script)])
+        else:
+            self.report_update(f'Nettalabbo {release["version"]} installed; it starts next time.', False)
 
     def show_about_document(self, key):
         """Display complete offline notices in a read-only, non-selectable viewer."""

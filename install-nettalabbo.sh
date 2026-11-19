@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Nettalabbo 0.5.0 installation helper for Xubuntu / Ubuntu.
+# Nettalabbo installation helper for Xubuntu / Ubuntu.
 # Packages are installed from configured Ubuntu repositories, never from third-party websites.
 # This script runs interactively and uses APT for dependency checks and installation.
 set -Eeuo pipefail
@@ -8,8 +8,13 @@ fail() { printf '\nERROR: %s\n' "$*" >&2; exit 1; }
 info() { printf '\n==> %s\n' "$*"; }
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PACKAGE="$DIR/nettalabbo_0.5.0-4_all.deb"
-[[ -f "$PACKAGE" ]] || fail "Missing .deb beside this installer: $PACKAGE"
+# Use the single Nettalabbo package beside this installer, whatever its revision.
+shopt -s nullglob
+CANDIDATES=("$DIR"/nettalabbo_*_all.deb)
+shopt -u nullglob
+(( ${#CANDIDATES[@]} == 1 )) || fail "Place exactly one nettalabbo_<version>_all.deb beside this installer (found ${#CANDIDATES[@]})."
+PACKAGE="${CANDIDATES[0]}"
+EXPECTED_VERSION="$(basename "$PACKAGE")"; EXPECTED_VERSION="${EXPECTED_VERSION#nettalabbo_}"; EXPECTED_VERSION="${EXPECTED_VERSION%_all.deb}"
 command -v apt-get >/dev/null || fail "APT is not available."
 command -v dpkg-deb >/dev/null || fail "dpkg-deb is not available."
 command -v apt-cache >/dev/null || fail "apt-cache is not available."
@@ -17,7 +22,7 @@ command -v sudo >/dev/null || fail "sudo is required."
 
 # Validate the package name and revision before elevating privileges.
 [[ "$(dpkg-deb -f "$PACKAGE" Package)" == "nettalabbo" ]] || fail "Invalid local Debian package."
-[[ "$(dpkg-deb -f "$PACKAGE" Version)" == "0.5.0-4" ]] || fail "Wrong package version."
+[[ "$(dpkg-deb -f "$PACKAGE" Version)" == "$EXPECTED_VERSION" ]] || fail "Package version does not match its file name."
 
 if [[ -r /etc/os-release ]]; then
   . /etc/os-release
@@ -112,6 +117,6 @@ info 'Verifying installation'
 status="$(dpkg-query -W -f='${db:Status-Abbrev}' nettalabbo 2>/dev/null || true)"
 [[ "$status" == ii* ]] || fail "Nettalabbo package is not fully installed: $status"
 installed_version="$(dpkg-query -W -f='${Version}' nettalabbo)"
-[[ "$installed_version" == '0.5.0-4' ]] || fail "Installed version differs: $installed_version"
+[[ "$installed_version" == "$EXPECTED_VERSION" ]] || fail "Installed version differs: $installed_version"
 printf '\nSUCCESS: Nettalabbo %s is installed, with all declared dependencies.\n' "$installed_version"
 printf '%s\n' 'Open Nettalabbo from the application menu or run: nettalabbo'

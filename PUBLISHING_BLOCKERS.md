@@ -7,3 +7,5 @@
 5. **Security:** validate SSH and Telnet authentication, hostile legacy responses and confidential-data handling.
 
 This is a limited audit package, not a certificate that distribution is risk-free.
+
+- **In-app updates:** they require public GitHub Releases (`v<version>` tag with the .deb and SHA256SUMS). Test the full update path on Xubuntu, including the pkexec password prompt, before relying on it.

@@ -1,3 +1,16 @@
+## 0.5.3 Debian revision 9 (19 November 2026)
+
+- Updates: Nettalabbo can check GitHub Releases once a day (asked once at first start; toggle and manual "Check for updates" in About). A newer `nettalabbo_<version>_all.deb` is downloaded to a private temporary folder, checked against the release's SHA256SUMS and its package metadata, then installed with `pkexec apt-get install` after confirmation and the administrator password. "Later" and "Skip this version" are available. Copies run from source are only told that a new version exists.
+- Time: suggested servers per protocol, including INRiM (time.inrim.it, ntp1/ntp2.inrim.it), NIST, PTB, METAS, Netnod, NTP Pool and the major public services, plus an optional list of historic time servers.
+- Time: if the chosen server does not answer, the other listed servers are tried in turn; the page reports which ones failed.
+- SNTP: version 4 request, clock offset and round-trip delay computed from all four timestamps with fractions, stratum and reference shown, replies validated (mode, originate timestamp, Kiss-o'-Death, unsynchronised servers), IPv6 support and correct dates after 2036.
+- Daytime and RFC 868 Time: IPv6 support, complete reads, indicative offset.
+- WhoIs: when querying whois.iana.org, the referral to the responsible registry is followed automatically; suggested servers include the regional registries, whois.nic.it and historic servers.
+- Quote: suggested public QOTD servers (default djxmmx.net), followed by historic ones.
+- Privacy: on every start, tighten configuration directories (current and legacy) to 0700 and the files inside them to 0600, fixing permissions left by earlier releases; symlinks and files owned by other users are left untouched.
+- Installer: `install-nettalabbo.sh` no longer hard-codes version 0.5.0-4; it installs the single `nettalabbo_<version>_all.deb` placed beside it and verifies that version.
+- Packaging: new modules added to the .deb; `packaging/make_release.sh` builds the release package and SHA256SUMS; a test checks that every local module is packaged.
+
 ## 0.5.3 Debian revision 8 (19 November 2026)
 
 - Trace: default ICMP probes when the local traceroute implementation supports them.
@@ -6,7 +19,6 @@
 - Ping: flag zero replies as failed rather than falsely completed.
 - SSH/Telnet PTY: attach a controlling terminal with util-linux setsid to allow OpenSSH to request authentication directly, rather than falling back to ssh_askpass.
 - Added offline regression tests for Trace, its fallback behaviour, and controlling-terminal support.
-- Privacy: on every start, tighten configuration directories (current and legacy) to 0700 and the files inside them to 0600, fixing permissions left by earlier releases; symlinks and files owned by other users are left untouched.
 - Functional correction still requires live verification on Xubuntu and varied networks; existing release blockers remain.
 
 ## 0.5.3 Debian revision 7 (19 November 2026)
