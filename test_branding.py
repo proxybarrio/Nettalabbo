@@ -7,7 +7,7 @@ import nettalabbo
 
 class BrandingTests(unittest.TestCase):
     def test_brand(self):
-        self.assertEqual(nettalabbo.VERSION, '0.5.3')
+        self.assertEqual(nettalabbo.VERSION, '0.5.4')
         self.assertEqual(nettalabbo.APP_DIR.name, 'nettalabbo')
 
     def test_icon_assets(self):
