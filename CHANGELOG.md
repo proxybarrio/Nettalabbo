@@ -75,4 +75,3 @@ This file summarises important project milestones and packaging changes. Nettala
 ## Earlier development · November 2026
 
 - Implemented classic network tools, Domain Inspector, experimental alternative-network browsing and the independent sidebar user interface.
-- Detailed earlier working notes are archived in [docs/DEVELOPMENT_NOTES_0.5.0_TO_0.5.3.md](docs/DEVELOPMENT_NOTES_0.5.0_TO_0.5.3.md).
