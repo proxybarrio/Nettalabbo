@@ -10,6 +10,7 @@ import re
 import shutil
 import subprocess
 from dataclasses import dataclass, field
+from mail_policy import spf_review, dmarc_review, dkim_review
 
 DOMAIN_DNSBL = ('dbl.spamhaus.org',)
 IP_DNSBL = ('zen.spamhaus.org', 'bl.spamcop.net')
@@ -108,18 +109,27 @@ def _dnsbl_lookup(report, resolver, entry, zone, label):
     except Exception as exc:
         report.add(label, 'unknown', 'Cannot determine listing: ' + str(exc))
         return
+    # An empty response does not prove the DNSBL is accessible or clear.
     if not answers:
-        report.add(label, 'pass', 'No listing returned by ' + zone)
-    elif all(ipaddress.ip_address(x).is_loopback for x in answers):
-        # DNSBL providers commonly use 127/8 for positive listings, but
-        # may also signal policy/rate-limit errors in that same space.
-        if any(x.startswith('127.255.') for x in answers):
-            report.add(label, 'unknown',
-                       'Provider returned a policy/error code: ' + ', '.join(answers))
-        else:
-            report.add(label, 'warn', 'Listing code(s): ' + ', '.join(answers))
+        report.add(label, 'unknown',
+                   'No listing returned; resolver access and DNSBL eligibility not established')
+        return
+    try:
+        parsed = [ipaddress.ip_address(x) for x in answers]
+    except ValueError:
+        report.add(label, 'unknown', 'Invalid provider response: ' + ', '.join(answers[:4]))
+        return
+    if not all(ip.version == 4 and ip.is_loopback for ip in parsed):
+        report.add(label, 'unknown', 'Unexpected provider response: ' + ', '.join(answers[:4]))
+        return
+    # 127.255.255.x signals policy/errors from several DNSBL services.
+    if any(x.startswith('127.255.255.') for x in answers):
+        report.add(label, 'unknown',
+                   'Provider policy or access error: ' + ', '.join(answers[:4]))
+    elif zone == 'dbl.spamhaus.org' and '127.0.1.255' in answers:
+        report.add(label, 'unknown', 'Provider rejected this query')
     else:
-        report.add(label, 'unknown', 'Unexpected DNSBL response: ' + ', '.join(answers))
+        report.add(label, 'warn', 'Provider returned listing code(s): ' + ', '.join(answers[:4]))
 
 
 def diagnose(domain, resolver=None, *, check_blacklists=False, dkim_selector='',
@@ -173,26 +183,13 @@ def diagnose(domain, resolver=None, *, check_blacklists=False, dkim_selector='',
 
     spf = _query(report, resolver, domain, 'TXT', 'SPF')
     if spf is not None:
-        entries = [x for x in spf if x.strip('"').lower().startswith('v=spf1')]
-        if len(entries) > 1:
-            report.add('SPF', 'fail', 'Multiple SPF records detected')
-        elif entries:
-            report.add('SPF', 'pass', entries[0][:250] +
-                       ' (syntax and DNS lookup limits not fully validated)')
-        else:
-            report.add('SPF', 'warn', 'No SPF record detected')
+        status, detail = spf_review(spf)
+        report.add('SPF', status, detail)
 
     dmarc = _query(report, resolver, '_dmarc.' + domain, 'TXT', 'DMARC')
     if dmarc is not None:
-        entries = [x for x in dmarc if x.strip('"').lower().startswith('v=dmarc1')]
-        if len(entries) > 1:
-            report.add('DMARC', 'fail', 'Multiple DMARC records detected')
-        elif entries:
-            policy = re.search(r'\bp=(none|quarantine|reject)\b', entries[0], re.I)
-            report.add('DMARC', 'pass' if policy else 'warn',
-                       entries[0][:250] if policy else 'Policy p= not detected')
-        else:
-            report.add('DMARC', 'warn', 'No DMARC record detected')
+        status, detail = dmarc_review(dmarc)
+        report.add('DMARC', status, detail)
 
     if dkim_selector.strip():
         selector = dkim_selector.strip()
@@ -201,8 +198,8 @@ def diagnose(domain, resolver=None, *, check_blacklists=False, dkim_selector='',
         else:
             txt = _query(report, resolver, selector + '._domainkey.' + domain, 'TXT', 'DKIM')
             if txt is not None:
-                report.add('DKIM', 'pass' if any('V=DKIM1' in x.upper() for x in txt) else 'warn',
-                           '; '.join(txt[:2])[:250] if txt else 'No DKIM key for this selector')
+                status, detail = dkim_review(txt)
+                report.add('DKIM', status, detail)
     else:
         report.add('DKIM', 'skipped', 'Selector required; DKIM cannot be reliably discovered automatically')
 
