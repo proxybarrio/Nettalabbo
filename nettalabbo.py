@@ -1546,6 +1546,9 @@ class App:
         self.diagnose_dnsbl = tk.BooleanVar(value=False)
         ttk.Checkbutton(frame, text='Query third-party DNS blacklists (discloses domain and public IPs)',
                         variable=self.diagnose_dnsbl).pack(anchor='w', pady=(0, 6))
+        self.diagnose_smtp = tk.BooleanVar(value=False)
+        ttk.Checkbutton(frame, text='Test SMTP on first MX server (connects to external host)',
+                        variable=self.diagnose_smtp).pack(anchor='w', pady=(0, 6))
         ttk.Label(frame, text='DNSBL policy and resolver limits can make results inconclusive. '
                   'No SMTP recipient verification is performed.',
                   wraplength=750).pack(anchor='w', pady=(0, 8))
@@ -1559,6 +1562,7 @@ class App:
         domain = self.inputs['Diagnose_domain'].get().strip()
         selector = self.diagnose_selector.get().strip()
         reputation = bool(self.diagnose_dnsbl.get())
+        smtp = bool(self.diagnose_smtp.get())
         if reputation and not messagebox.askyesno(
                 'External DNS blacklist queries',
                 'DNSBL operators will receive queries containing the domain '
@@ -1570,7 +1574,7 @@ class App:
                 return
             try:
                 report = run_domain_diagnose(domain, check_blacklists=reputation,
-                                             dkim_selector=selector)
+                                             dkim_selector=selector, check_smtp=smtp)
                 if not stop.is_set():
                     self.post(self.append, page, report.as_text() + '\n')
                     self.post(self.set_status, page, 'Diagnostic checks completed.')
