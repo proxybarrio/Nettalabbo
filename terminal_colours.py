@@ -45,12 +45,17 @@ class ColourTerminalScreen(TerminalScreen):
 
     def _row(self):
         before = len(self.lines)
+        # Base screen drops the oldest row after reaching max_lines.
+        # Track the number dropped even when the total stays unchanged.
+        wanted = min(max(0, self.y), self.max_lines) + 1
+        removed = max(0, before + max(0, wanted - before) - self.max_lines)
         super()._row()
-        removed = max(0, before - len(self.lines))
         if removed:
             del self.cell_styles[:removed]
         while len(self.cell_styles) < len(self.lines):
             self.cell_styles.append([])
+        if len(self.cell_styles) > len(self.lines):
+            del self.cell_styles[:len(self.cell_styles) - len(self.lines)]
 
     def _put(self, char):
         if self.x > 300:
