@@ -34,10 +34,16 @@ class DiagnoseTests(unittest.TestCase):
     def test_blacklist_status_is_not_false_clean(self):
         fake=self.fixture()
         fake.answers[('example.org.dbl.spamhaus.org','A')]=['127.0.1.2']
-        fake.failures.add(('34.216.184.93.zen.spamhaus.org','A'))
+        fake.failures.add(('35.216.184.93.zen.spamhaus.org','A'))
         report=diagnose('example.org',fake,check_blacklists=True)
         self.assertTrue(any('Domain DNSBL:' in x.name and x.status=='warn' for x in report.checks))
         self.assertTrue(any('DNSBL:' in x.name and x.status=='unknown' for x in report.checks))
+    def test_ip_blacklists_target_mail_servers_not_website(self):
+        fake = self.fixture()
+        diagnose('example.org', fake, check_blacklists=True)
+        self.assertIn(('35.216.184.93.zen.spamhaus.org','A'), fake.requests)
+        self.assertNotIn(('34.216.184.93.zen.spamhaus.org','A'), fake.requests)
+
     def test_duplicate_spf_and_missing_dmarc(self):
         fake=FakeResolver({('example.org','TXT'): ['"v=spf1 -all"','"v=spf1 +all"']})
         report=diagnose('example.org',fake)
