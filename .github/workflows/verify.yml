@@ -23,6 +23,21 @@ jobs:
         run: python3 -m compileall -q .
       - name: Run offline unit and integration tests
         run: xvfb-run -a python3 -m unittest discover -v
+      - name: Public DNS smoke check (non-gating, no blacklist or SMTP requests)
+        continue-on-error: true
+        timeout-minutes: 2
+        run: |
+          python3 - <<'PY'
+          from diagnose import diagnose
+          report = diagnose('example.com', check_blacklists=False, check_smtp=False)
+          print(report.as_text())
+          assert any(x.name in ('A records', 'AAAA records') and x.status == 'pass'
+                     for x in report.checks), 'Public DNS did not return an address'
+          assert any(x.name == 'DNSBL' and x.status == 'skipped'
+                     for x in report.checks)
+          assert any(x.name == 'SMTP connectivity' and x.status == 'skipped'
+                     for x in report.checks)
+          PY
       - name: Build Debian package
         run: bash packaging/build_deb.sh "$RUNNER_TEMP"
       - name: Verify Debian package contents
