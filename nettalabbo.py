@@ -1875,7 +1875,7 @@ class App:
         ttk.Label(f, textvariable=self.legacy_detail, wraplength=760).pack(anchor='w', pady=(0, 5))
         self.status[page] = tk.StringVar(value='Ready. Press Go or Enter to navigate.')
         ttk.Label(f, textvariable=self.status[page]).pack(anchor='w', pady=(0, 3))
-        self.legacy_status_detail = tk.StringVar(value='Blue: menus   ·   Green: documents   ·   Orange: external destinations')
+        self.legacy_status_detail = tk.StringVar(value=legacy_link_legend(self.legacy_theme.get()))
         ttk.Label(f, textvariable=self.legacy_status_detail, foreground='#537284').pack(anchor='w', pady=(0, 3))
         self.text_output(f, page)
         self.legacy_update_navigation()
