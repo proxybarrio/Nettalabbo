@@ -57,6 +57,28 @@ class DiagnoseTests(unittest.TestCase):
         self.assertEqual(fake.requests,[])
     def test_idna(self):
         self.assertEqual(domain_name('perché.it'),'xn--perch-fsa.it')
+    def test_smtp_is_opt_in_and_read_only(self):
+        fake = self.fixture()
+        calls = []
+        def probe(kind, host, port):
+            calls.append((kind, host, port))
+            return 'SMTP connection: mail.example.org:25\nTLS negotiated: yes\nNo email sent.'
+        default = diagnose('example.org', fake, mail_probe=probe)
+        self.assertEqual(calls, [])
+        self.assertTrue(any(x.name == 'SMTP connectivity' and x.status == 'skipped'
+                            for x in default.checks))
+        enabled = diagnose('example.org', fake, check_smtp=True, mail_probe=probe)
+        self.assertEqual(calls, [('SMTP', 'mail.example.org', 25)])
+        self.assertTrue(any(x.name == 'SMTP connectivity' and x.status == 'pass'
+                            for x in enabled.checks))
+
+    def test_smtp_errors_are_unknown_not_success(self):
+        def unavailable(*args):
+            raise OSError('Connection timed out')
+        report = diagnose('example.org', self.fixture(), check_smtp=True, mail_probe=unavailable)
+        self.assertTrue(any(x.name == 'SMTP connectivity' and x.status == 'unknown'
+                            for x in report.checks))
+
     def test_no_dkim_guess(self):
         r=diagnose('example.org', FakeResolver())
         self.assertTrue(any(x.name=='DKIM' and x.status=='skipped' for x in r.checks))
