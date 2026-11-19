@@ -1,0 +1,35 @@
+name: Nettalabbo verification
+on:
+  push:
+    branches:
+      - feature/legacy-colour-themes
+  pull_request:
+    branches:
+      - main
+permissions:
+  contents: read
+jobs:
+  tests:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+      - name: Install test dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-tk xvfb iputils-ping traceroute openssh-client telnet bind9-dnsutils
+      - name: Compile all Python modules
+        run: python3 -m compileall -q .
+      - name: Run offline unit and integration tests
+        run: xvfb-run -a python3 -m unittest discover -v
+      - name: Build Debian package
+        run: bash packaging/build_deb.sh "$RUNNER_TEMP"
+      - name: Verify Debian package contents
+        run: |
+          deb="$RUNNER_TEMP/nettalabbo_0.5.3-9_all.deb"
+          test -s "$deb"
+          dpkg-deb --contents "$deb" > "$RUNNER_TEMP/package_contents.txt"
+          grep -q '/usr/share/nettalabbo/diagnose.py' "$RUNNER_TEMP/package_contents.txt"
+          grep -q '/usr/share/nettalabbo/terminal_colours.py' "$RUNNER_TEMP/package_contents.txt"
+          grep -q '/usr/share/nettalabbo/legacy_theme.py' "$RUNNER_TEMP/package_contents.txt"
