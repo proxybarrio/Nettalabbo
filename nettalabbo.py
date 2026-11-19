@@ -37,7 +37,8 @@ import dns_lookup
 import updater
 from historic_servers import HISTORIC_SERVERS, catalog_groups, get_entry, connection_fields, protocol_endpoint, access_label
 from about_documents import load_about_document, ABOUT_DOCUMENTS
-from legacy_view import segments as legacy_segments, raw_text as legacy_raw_text, link_color as legacy_link_color, distinct_links as legacy_distinct_links
+from legacy_view import segments as legacy_segments, raw_text as legacy_raw_text, distinct_links as legacy_distinct_links
+from legacy_theme import THEME_NAMES as LEGACY_THEME_NAMES, palette as legacy_palette, link_legend as legacy_link_legend
 from urllib.parse import urlsplit, urlunsplit, quote as url_quote
 import webbrowser
 
@@ -1833,6 +1834,14 @@ class App:
                         command=self.legacy_redraw).pack(side='left')
         ttk.Radiobutton(action, text='Raw', value='Raw', variable=self.legacy_display_mode,
                         command=self.legacy_redraw).pack(side='left', padx=(6, 10))
+        ttk.Label(action, text='Colours:').pack(side='left', padx=(2, 4))
+        saved_theme = self.settings.get('legacy_theme', 'Classic')
+        if saved_theme not in LEGACY_THEME_NAMES:
+            saved_theme = 'Classic'
+        self.legacy_theme = tk.StringVar(value=saved_theme)
+        ttk.Combobox(action, textvariable=self.legacy_theme, values=LEGACY_THEME_NAMES,
+                     state='readonly', width=12).pack(side='left', padx=(0, 8))
+        self.legacy_theme.trace_add('write', lambda *_: self.legacy_colour_changed())
         ttk.Button(action, text='Sample servers...', command=self.legacy_example_dialog).pack(side='left', padx=(0, 5))
         ttk.Button(action, text='Copy', command=lambda: self.copy_output(page)).pack(side='left', padx=5)
         ttk.Button(action, text='Save', command=lambda: self.save_output(page)).pack(side='left')
@@ -1969,6 +1978,15 @@ class App:
         listing.bind('<Double-Button-1>', go)
         ttk.Button(win, text='Open selected', command=go).pack(anchor='e', padx=12, pady=(0, 10))
 
+    def legacy_colour_changed(self):
+        """Save only the appearance preference; never mutate protocol results."""
+        name = self.legacy_theme.get()
+        if name not in LEGACY_THEME_NAMES:
+            return
+        self.settings['legacy_theme'] = name
+        self.persist()
+        self.legacy_redraw()
+
     def legacy_redraw(self):
         if self.legacy_current_result:
             self.legacy_show_result(self.legacy_current_result)
@@ -1980,25 +1998,30 @@ class App:
         w = self.output[page]
         w.configure(state='normal')
         w.delete('1.0', 'end')
+        colours = legacy_palette(self.legacy_theme.get())
+        # Raw remains unstyled and shows exactly the available server response.
         if self.legacy_display_mode.get() == 'Raw':
+            w.configure(background='white', foreground='#292b30', insertbackground='#292b30')
             w.insert('end', legacy_raw_text(result))
         else:
-            w.tag_configure('legacy_heading', font=('Sans', 12, 'bold'), foreground='#194f75', spacing1=8)
-            w.tag_configure('legacy_info', foreground='#546473')
+            w.configure(background=colours['background'], foreground=colours['foreground'],
+                        insertbackground=colours['foreground'])
+            w.tag_configure('legacy_heading', font=('Sans', 12, 'bold'), foreground=colours['heading'], spacing1=8)
+            w.tag_configure('legacy_info', foreground=colours['info'])
             w.insert('end', '{}  ·  {}  ·  {} bytes\n\n'.format(result.protocol.upper(), result.status, result.bytes_received), 'legacy_info')
             for index, (kind, label, destination) in enumerate(legacy_segments(result)):
                 if not destination:
                     w.insert('end', label, 'legacy_heading' if kind == 'heading' else 'legacy_info' if kind == 'info' else ())
                     continue
                 tag = 'legacy_hyperlink_{}'.format(index)
-                w.tag_configure(tag, foreground=legacy_link_color(kind), underline=1)
+                w.tag_configure(tag, foreground=colours[kind], underline=1)
                 w.insert('end', label, tag)
                 w.tag_bind(tag, '<Button-1>', lambda e, url=destination: self.legacy_navigate(url))
                 w.tag_bind(tag, '<Enter>', lambda e, url=destination, widget=w: (
                     widget.configure(cursor='hand2'), self.legacy_status_detail.set(url)))
                 w.tag_bind(tag, '<Leave>', lambda e, widget=w: (
                     widget.configure(cursor='xterm'),
-                    self.legacy_status_detail.set('Blue: menus   ·   Green: documents   ·   Orange: external destinations')))
+                    self.legacy_status_detail.set(legacy_link_legend(self.legacy_theme.get()))))
         w.configure(state='disabled')
         self.legacy_links_menu.delete(0, 'end')
         links = legacy_distinct_links(legacy_segments(result))
@@ -2013,7 +2036,7 @@ class App:
         self.legacy_links_button.configure(text='Links ({}) ▾'.format(len(links)),
                                            state=('normal' if links else 'disabled'))
         self.legacy_detail.set('Click underlined links, including URLs in text documents.  {} link(s) found.'.format(len(links)))
-        self.legacy_status_detail.set('Blue: menus   ·   Green: documents   ·   Orange: external destinations')
+        self.legacy_status_detail.set(legacy_link_legend(self.legacy_theme.get()))
 
     def legacy_example_dialog(self):
         # Public reference endpoints only; individual services may change or become unavailable.
