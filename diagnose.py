@@ -122,7 +122,8 @@ def _dnsbl_lookup(report, resolver, entry, zone, label):
         report.add(label, 'unknown', 'Unexpected DNSBL response: ' + ', '.join(answers))
 
 
-def diagnose(domain, resolver=None, *, check_blacklists=False, dkim_selector=''):
+def diagnose(domain, resolver=None, *, check_blacklists=False, dkim_selector='',
+             check_smtp=False, mail_probe=None):
     """Perform bounded, read-only public DNS checks.
 
     Returns a structured report. Every skipped or indeterminate check is
@@ -213,6 +214,25 @@ def diagnose(domain, resolver=None, *, check_blacklists=False, dkim_selector='')
         if txt is not None:
             report.add(name, 'pass' if txt else 'warn',
                        '; '.join(txt[:2])[:250] if txt else 'No policy record found')
+
+    if check_smtp:
+        if mx_hosts:
+            # Explicit single MX test. No mail delivery, auth or recipient check.
+            if mail_probe is None:
+                from mail_inspector import test_mail_service
+                mail_probe = test_mail_service
+            try:
+                greeting = mail_probe('SMTP', mx_hosts[0], 25)
+                secure = 'TLS negotiated: yes' in greeting
+                report.add('SMTP connectivity', 'pass' if secure else 'warn',
+                           greeting[:500])
+            except Exception as exc:
+                report.add('SMTP connectivity', 'unknown', str(exc)[:300])
+        else:
+            report.add('SMTP connectivity', 'skipped', 'No usable MX hostname found')
+    else:
+        report.add('SMTP connectivity', 'skipped',
+                   'Direct mail-server connection disabled by default')
 
     if not check_blacklists:
         report.add('DNSBL', 'skipped', 'Third-party reputation queries disabled by default')
