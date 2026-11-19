@@ -2,7 +2,7 @@
 
 **Network Laboratory app for Xubuntu and other Ubuntu systems**
 
-**Current version:** 0.5.3 (Debian packaging revision 6)  
+**Current version:** 0.5.3 (Debian packaging revision 8)  
 **Status:** experimental / active testing  
 **Platform:** Xubuntu and other Ubuntu-based Linux systems  
 **Written by:** Proxybarrio, with AI-assisted development  
@@ -34,7 +34,7 @@ Download the `.deb` release and, from its directory, run:
 
 ```bash
 sudo apt update
-sudo apt install ./nettalabbo_0.5.3-7_all.deb
+sudo apt install ./nettalabbo_0.5.3-8_all.deb
 ```
 
 APT resolves and installs required system packages from your configured Ubuntu repositories. The package uses the identity `nettalabbo` and replaces packages previously named `netlabbo`, `network-laboratory-xubuntu` or `netlab-xubuntu`, preserving personal configuration files for migration. Launch the app from the Xubuntu menu or run:
