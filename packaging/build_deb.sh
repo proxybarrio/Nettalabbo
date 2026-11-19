@@ -19,7 +19,7 @@ cp "$SOURCE_DIR/packaging/nettalabbo.desktop" "$BUILD_DIR/usr/share/applications
 mkdir -p "$BUILD_DIR/usr/share/pixmaps"
 cp "$SOURCE_DIR/assets/nettalabbo_128.png" "$BUILD_DIR/usr/share/pixmaps/nettalabbo.png"
 cp "$SOURCE_DIR/org.nettalabbo.Nettalabbo.metainfo.xml" "$BUILD_DIR/usr/share/metainfo/"
-for filename in nettalabbo.py about_documents.py domain_rdap.py remote_terminal.py legacy_protocols.py legacy_view.py mail_inspector.py historic_servers.py time_services.py service_catalog.py updater.py dns_lookup.py; do
+for filename in nettalabbo.py about_documents.py domain_rdap.py remote_terminal.py legacy_protocols.py legacy_view.py mail_inspector.py historic_servers.py time_services.py service_catalog.py updater.py dns_lookup.py diagnose.py terminal_colours.py legacy_theme.py mail_policy.py; do
     cp "$SOURCE_DIR/$filename" "$BUILD_DIR/usr/share/nettalabbo/"
 done
 cp "$SOURCE_DIR/assets/"* "$BUILD_DIR/usr/share/nettalabbo/assets/"

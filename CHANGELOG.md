@@ -1,3 +1,11 @@
+## 0.5.4 Debian revision 1 (development candidate, 19 November 2026)
+
+- Diagnose: DNS and mail checks for A, AAAA, MX, SPF, DMARC, optional DKIM selector, MTA STS and TLS RPT; SMTP connectivity and DNSBL require explicit opt in.
+- Mail policy review distinguishes publication from verification; duplicate/invalid policies and provider access errors receive explicit statuses.
+- SSH and Telnet: ANSI 16/256/true-colour rendering; cursor and scrollback hardening. A complete terminal emulator is not claimed.
+- Legacy Navigator: Classic, Dark and Monochrome palettes without changing links, Back/Forward/Home/Stop or Raw view.
+- Added regression tests and verification workflow for the new components. Live network, SMTP, DNSBL and Xubuntu installation checks are still required before public release.
+
 ## 0.5.3 Debian revision 9 (19 November 2026)
 
 - Updates: Nettalabbo can check GitHub Releases once a day (asked once at first start; toggle and manual "Check for updates" in About). A newer `nettalabbo_<version>_all.deb` is downloaded to a private temporary folder, checked against the release's SHA256SUMS and its package metadata, then installed with `pkexec apt-get install` after confirmation and the administrator password. "Later" and "Skip this version" are available. Copies run from source are only told that a new version exists.

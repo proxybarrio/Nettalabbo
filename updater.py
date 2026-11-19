@@ -124,11 +124,20 @@ def _check_url(url):
         raise UpdateError(f'Refusing to download from {parts.scheme}://{parts.hostname}')
 
 
+class _GitHubRedirectHandler(urllib.request.HTTPRedirectHandler):
+    """Reject a redirect *before* making any request to an external host."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        _check_url(newurl)
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
 def _open(url, timeout, accept='application/octet-stream'):
     _check_url(url)
     request = urllib.request.Request(url, headers={'Accept': accept, 'User-Agent': 'Nettalabbo-updater'})
-    response = urllib.request.urlopen(request, timeout=timeout)
-    _check_url(response.geturl())  # redirects must stay on GitHub
+    opener = urllib.request.build_opener(_GitHubRedirectHandler())
+    response = opener.open(request, timeout=timeout)
+    _check_url(response.geturl())  # defence in depth after redirects
     return response
 
 

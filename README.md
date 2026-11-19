@@ -2,7 +2,7 @@
 
 **Network Laboratory app for Xubuntu and other Ubuntu systems**
 
-**Current version:** 0.5.3 (Debian packaging revision 8)  
+**Current development version:** 0.5.4 (Debian packaging revision 1, release candidate)  
 **Status:** experimental / active testing  
 **Platform:** Xubuntu and other Ubuntu-based Linux systems  
 **Written by:** Proxybarrio, with AI-assisted development  
@@ -34,7 +34,7 @@ Download the `.deb` release and, from its directory, run:
 
 ```bash
 sudo apt update
-sudo apt install ./nettalabbo_0.5.3-9_all.deb
+sudo apt install ./nettalabbo_0.5.4-1_all.deb
 ```
 
 APT resolves and installs required system packages from your configured Ubuntu repositories. The package uses the identity `nettalabbo` and replaces packages previously named `netlabbo`, `network-laboratory-xubuntu` or `netlab-xubuntu`, preserving personal configuration files for migration. Launch the app from the Xubuntu menu or run:
@@ -46,6 +46,13 @@ nettalabbo
 Nettalabbo works on the current Xubuntu and Ubuntu release and on older releases back to 20.04 LTS, where it has been tested. Releases older than 20.04 have not been tested. Ubuntu 20.04 is outside standard security support; keep it covered by extended security maintenance if you use it for network work.
 
 See [INSTALL_XUBUNTU.md](INSTALL_XUBUNTU.md) and [UPGRADE_POLICY.md](UPGRADE_POLICY.md).
+
+## New in 0.5.4 (development branch)
+
+- **Diagnose:** DNS and mail configuration assessment (MX, SPF, DMARC, DKIM selector, MTA STS, TLS RPT). Optional SMTP connectivity and domain/IP DNSBL queries require consent. DNSBL access errors and indeterminate responses are not treated as clean reputation; a successful result does not guarantee email delivery.
+- **SSH and Telnet:** ANSI colour presentation and additional limits for hostile cursor sequences; this is **not** a full xterm emulator.
+- **Legacy Navigator:** optional Classic, Dark and Monochrome colours without changing clickable links, history or original Raw responses.
+- All features require live validation on Xubuntu and suitable test servers before a public release.
 
 ## Important limitations
 
@@ -59,7 +66,7 @@ See [INSTALL_XUBUNTU.md](INSTALL_XUBUNTU.md) and [UPGRADE_POLICY.md](UPGRADE_POL
 
 ## Feedback and development
 
-Feedback, bug reports and contributions are welcome via the GitHub repository once it has been created under **Proxybarrio**. Please report sensitive security vulnerabilities privately by email rather than publicly. Please include the Nettalabbo version, Xubuntu/Ubuntu version, exact steps and diagnostic output, removing usernames, passwords and other sensitive information first.
+Feedback, bug reports and contributions are welcome via the **Proxybarrio/Nettalabbo** GitHub repository. Please report sensitive security vulnerabilities privately by email rather than publicly. Please include the Nettalabbo version, Xubuntu/Ubuntu version, exact steps and diagnostic output, removing usernames, passwords and other sensitive information first.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md), [CHANGELOG.md](CHANGELOG.md), and [ROADMAP.md](ROADMAP.md).
 

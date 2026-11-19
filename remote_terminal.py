@@ -210,6 +210,8 @@ class TerminalScreen:
         self.params = ''
 
     def _row(self):
+        # Untrusted terminal output must not allocate unbounded rows.
+        self.y = min(max(0, self.y), max(0, self.max_lines))
         while self.y >= len(self.lines):
             self.lines.append([])
         while len(self.lines) > self.max_lines:
@@ -246,11 +248,11 @@ class TerminalScreen:
         elif cmd == 'J' and n in (2, 3):
             self.clear()
         elif cmd == 'A': self.y = max(0, self.y - (n or 1))
-        elif cmd == 'B': self.y += (n or 1)
+        elif cmd == 'B': self.y = min(self.max_lines, self.y + (n or 1))
         elif cmd == 'C': self.x = min(300, self.x + (n or 1))
         elif cmd == 'D': self.x = max(0, self.x - (n or 1))
         elif cmd in ('H', 'f'):
-            self.y = max(0, (args[0] if args else 1) - 1)
+            self.y = min(self.max_lines, max(0, (args[0] if args else 1) - 1))
             self.x = max(0, (args[1] if len(args) > 1 else 1) - 1)
         elif cmd == 'G': self.x = max(0, (n or 1) - 1)
         # Text styling (SGR), private modes and unhandled CSI are ignored.
