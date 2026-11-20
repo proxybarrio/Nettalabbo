@@ -13,7 +13,10 @@ class HistoricServersTests(unittest.TestCase):
     def test_horizons_is_not_telnet(self):
         self.assertIsNone(hs.connection_fields(hs.get_entry('horizons')))
     def test_groups(self):
-        self.assertEqual(len(hs.catalog_groups('telnet')),5)
+        self.assertEqual(len(hs.catalog_groups('telnet')),19)
+        for item in hs.catalog_groups('telnet'):
+            self.assertTrue(item['url'].startswith('https://'), item['id'])
+            self.assertTrue(1 <= int(item['port']) <= 65535, item['id'])
         self.assertEqual(len(hs.catalog_groups('ssh')),4)
         self.assertEqual(len(hs.catalog_groups('reference')),3)
     def test_dual_connect_choices(self):

@@ -50,3 +50,30 @@ jobs:
           grep -q '/usr/share/nettalabbo/diagnose.py' "$RUNNER_TEMP/package_contents.txt"
           grep -q '/usr/share/nettalabbo/terminal_colours.py' "$RUNNER_TEMP/package_contents.txt"
           grep -q '/usr/share/nettalabbo/legacy_theme.py' "$RUNNER_TEMP/package_contents.txt"
+
+  focal-python38:
+    # Oldest supported release: Ubuntu 20.04 with its own Python 3.8 and Tk,
+    # tests plus a real APT installation of the built package.
+    runs-on: ubuntu-24.04
+    container: ubuntu:20.04
+    timeout-minutes: 20
+    env:
+      DEBIAN_FRONTEND: noninteractive
+    steps:
+      - name: Install Ubuntu 20.04 packages
+        run: |
+          apt-get update
+          apt-get install -y python3 python3-tk xvfb xauth iputils-ping traceroute openssh-client telnet dnsutils ca-certificates
+      - name: Checkout source
+        uses: actions/checkout@v5
+      - name: Show Python and Tk versions
+        run: python3 -c "import sys, tkinter; print(sys.version); print('Tk', tkinter.TkVersion)"
+      - name: Run all tests on Python 3.8
+        run: xvfb-run -a python3 -m unittest discover -v
+      - name: Build the Debian package
+        run: bash packaging/build_deb.sh /tmp/deb
+      - name: Install the package with APT and start it
+        run: |
+          apt-get install -y /tmp/deb/nettalabbo_*_all.deb
+          dpkg-query -W -f='${Package} ${Version} ${Status}\n' nettalabbo
+          xvfb-run -a python3 -c "import sys, tkinter; sys.path.insert(0, '/usr/share/nettalabbo'); import nettalabbo; root = tkinter.Tk(); app = nettalabbo.App(root); [app.select_page(p) or root.update() for p in nettalabbo.TABS]; print('Started', nettalabbo.PACKAGE_VERSION, 'with', len(nettalabbo.TABS), 'pages'); root.destroy()"

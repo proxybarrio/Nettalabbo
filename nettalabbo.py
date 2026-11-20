@@ -1850,6 +1850,12 @@ class App:
                     'Prior':'\x1b[5~', 'Next':'\x1b[6~'}.get(key)
         if sequence is None and ctrl and len(key) == 1 and key.isalpha():
             sequence = chr(ord(key.lower()) - ord('a') + 1)
+        if sequence is None and ctrl:
+            # Control codes on symbol keys: Ctrl+] is the telnet escape key,
+            # Ctrl+backslash sends SIGQUIT, Ctrl+[ is Escape, Ctrl+Space/Ctrl+@ is NUL.
+            sequence = {'bracketright': '\x1d', 'backslash': '\x1c', 'bracketleft': '\x1b',
+                        'asciicircum': '\x1e', 'underscore': '\x1f', 'minus': '\x1f',
+                        'at': '\x00', 'space': '\x00', '2': '\x00'}.get(key)
         if sequence is None and event.char and event.char.isprintable():
             sequence = event.char
         if sequence:
@@ -1872,15 +1878,23 @@ class App:
             if not messagebox.askokcancel('Unencrypted Telnet',
                 'Telnet sends all data, including passwords, without encryption.\n\nConnect anyway?'):
                 return
+        first_output = [True]
+        def on_text(text):
+            self.post(self.remote_write, page, text)
+            if first_output[0]:
+                first_output[0] = False
+                self.post(self.set_status, page, 'Session running. Use Disconnect to close it.')
+                self.post(self.remote_status[page].set,
+                          'Session running. It stays open when you switch tabs.')
         session = PtySession(
-            on_text=lambda text: self.post(self.remote_write, page, text),
+            on_text=on_text,
             on_exit=lambda code: self.post(self.remote_finished, page, session, code))
         self.remote_sessions[page] = session
         self.remote_clear(page)
         self.remote_write(page, f'Connecting to {self.inputs[f"{page}_host"].get().strip()} ({page})…\r\n')
         self.remote_buttons[page][0].configure(state='disabled')
         self.remote_buttons[page][1].configure(state='normal')
-        self.remote_status[page].set('Connecting / connected. The session stays open when you switch tabs.')
+        self.remote_status[page].set('Connecting…')
         self.set_status(page, 'Connecting…')
         session.start(cmd)
         self.remote_consoles[page].focus_set()

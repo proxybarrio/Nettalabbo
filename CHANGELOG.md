@@ -11,6 +11,9 @@
 - Window: the status bar with Help and Quit was hidden at the default window size (the content needed 953 pixels in an 820-pixel window); it is now always visible, and the first window size fits smaller laptop screens.
 - Updates: a failed automatic check counts as the daily check, so an unreachable release page is not contacted at every start.
 - SSH: the information line no longer gets cut off; DNS page description mentions record types.
+- Telnet: 14 more public Telnet services in the server catalogue (MapSCII world map, Star Wars ASCII animation over IPv6, Wikipedia over Telnet, Doom, a classic Mac desktop demo, Galacticomm and Archaic Binary BBS, Legend of the Red Dragon, Achaea, Avalon, ZombieMUD, Igor MUD, Forgotten Kingdoms), each with its source; listed as online by telnet.org in November 2026, not a live availability guarantee.
+- SSH and Telnet: Ctrl with symbol keys now reaches the remote side, so Ctrl+] opens the telnet> escape prompt (and Ctrl+backslash, Ctrl+[ work); the status line changes from "Connecting" to "Session running" when the session produces output.
+- Verification: a second GitHub Actions job runs every test inside Ubuntu 20.04 with its own Python 3.8 and Tk, then installs the built package with APT and starts it.
 - Added regression tests and verification workflow for the new components. Live network, SMTP, DNSBL and Xubuntu installation checks are still required before public release.
 
 ## 0.5.3 Debian revision 9 (19 November 2026)

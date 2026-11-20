@@ -125,6 +125,56 @@ class LayoutTest(GuiCase):
             self.assertLessEqual(footer.winfo_y() + footer.winfo_height(), self.root.winfo_height(), page)
 
 
+class TerminalKeysTest(GuiCase):
+    def send_key(self, keysym, ctrl=False, char=''):
+        sent = []
+
+        class Session:
+            def send(self, data):
+                sent.append(data)
+
+        class Event:
+            pass
+        event = Event()
+        event.keysym, event.state, event.char = keysym, (0x4 if ctrl else 0), char
+        self.app.remote_sessions['Telnet'] = Session()
+        try:
+            result = self.app.remote_key('Telnet', event)
+        finally:
+            self.app.remote_sessions['Telnet'] = None
+        return sent, result
+
+    def test_control_symbols_reach_the_remote_client(self):
+        self.assertEqual(self.send_key('bracketright', ctrl=True)[0], ['\x1d'])  # telnet escape
+        self.assertEqual(self.send_key('backslash', ctrl=True)[0], ['\x1c'])
+        self.assertEqual(self.send_key('bracketleft', ctrl=True)[0], ['\x1b'])
+        self.assertEqual(self.send_key('d', ctrl=True)[0], ['\x04'])
+        self.assertEqual(self.send_key('a', char='a')[0], ['a'])
+
+    def test_status_changes_when_session_produces_output(self):
+        created = {}
+
+        class FakeSession:
+            def __init__(self, on_text, on_exit):
+                created['on_text'] = on_text
+
+            def start(self, command):
+                pass
+
+        self.app.inputs['Telnet_host'].set('127.0.0.1')
+        with patch.object(nettalabbo, 'PtySession', FakeSession), \
+                patch.object(nettalabbo.messagebox, 'askokcancel', return_value=True), \
+                patch.object(nettalabbo, 'connection_command', return_value=['true']):
+            self.app.connect_remote('Telnet')
+            created['on_text']('Connected to 127.0.0.1.\r\n')
+            for _ in range(10):
+                self.root.update()
+                time.sleep(0.02)
+        self.assertIn('Session running', self.app.footer_status.get())
+        self.assertIn('Session running', self.app.remote_status['Telnet'].get())
+        self.app.remote_sessions['Telnet'] = None
+
+
 class PrintTest(GuiCase):
     def fake_tools(self, folder, default='Office_Laser'):
         bin_dir = Path(folder)
