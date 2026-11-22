@@ -43,13 +43,18 @@ jobs:
         run: bash packaging/build_deb.sh "$RUNNER_TEMP"
       - name: Verify Debian package contents
         run: |
-          deb="$RUNNER_TEMP/nettalabbo_0.5.4-1_all.deb"
+          version="$(sed -n 's/^Version: //p' packaging/control | head -n 1)"
+          deb="$RUNNER_TEMP/nettalabbo_${version}_all.deb"
           test -s "$deb"
           dpkg-deb --contents "$deb" > "$RUNNER_TEMP/package_contents.txt"
           grep -q '/usr/share/nettalabbo/mail_policy.py' "$RUNNER_TEMP/package_contents.txt"
           grep -q '/usr/share/nettalabbo/diagnose.py' "$RUNNER_TEMP/package_contents.txt"
           grep -q '/usr/share/nettalabbo/terminal_colours.py' "$RUNNER_TEMP/package_contents.txt"
           grep -q '/usr/share/nettalabbo/legacy_theme.py' "$RUNNER_TEMP/package_contents.txt"
+          if grep -E 'REVIEW|PRECHECK|BLOCKERS' "$RUNNER_TEMP/package_contents.txt"; then
+            echo "Internal review documents must not be packaged" >&2
+            exit 1
+          fi
 
   focal-python38:
     # Oldest supported release: Ubuntu 20.04 with its own Python 3.8 and Tk,

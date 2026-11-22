@@ -8,7 +8,7 @@ This repository is an experimental software project under the MIT License. Autho
 
 1. Create a new **private** GitHub repository named `nettalabbo` in the authenticated `proxybarrio` account without initializing a README, License or `.gitignore`. This is the conservative option pending outstanding trademark review.
 2. Upload or push the source tree with `README.md` at repository root. Do not add the 1998 NetLab95 executable or manual.
-3. Before making the repository public, review `TRADEMARK_PRECHECK.md`, `SECURITY_REVIEW_2026-11-19.md`, `RELEASE_REVIEW_2026-11-19.md`, and the security disclaimer.
+3. Before making the repository public, review the security disclaimer.
 4. Only after creating and checking the repository, confirm the Issues and private security-contact instructions.
 5. If releasing Debian binaries, attach the `.deb` to a GitHub Release rather than committing it into source history.
 

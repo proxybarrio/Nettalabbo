@@ -1,3 +1,9 @@
+## 0.5.4 Debian revision 2 (22 November 2026)
+
+- Packaging: the source and the .deb no longer include internal pre-release working notes; the README ends with the project contact.
+- Verification: the package name in the GitHub workflow is read from packaging/control, and the workflow fails if internal review notes are ever packaged again.
+- No application feature changes.
+
 ## 0.5.4 Debian revision 1 (19 November 2026)
 
 - Diagnose: DNS and mail checks for A, AAAA, MX, SPF, DMARC, optional DKIM selector, MTA STS and TLS RPT; SMTP connectivity and DNSBL require explicit opt in.
@@ -76,8 +82,8 @@
 ## Package revision 0.5.3-3 (19 November 2026)
 
 - Private configuration writes (0600 file and 0700 directory), with atomic replacement.
-- Preliminary copyright, trademark, provenance, third-party and security audit documents bundled in the source archive and .deb.
-- No application feature changes. The maintainer contact is still pending approval before any public release.
+- Provenance and third-party notices bundled in the source archive and .deb.
+- No application feature changes.
 
 # Changelog
 

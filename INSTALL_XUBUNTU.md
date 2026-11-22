@@ -21,7 +21,7 @@ Open a terminal in the folder containing the downloaded package (usually `~/Down
 
 ```bash
 sudo apt update
-sudo apt install ./nettalabbo_0.5.4-1_all.deb
+sudo apt install ./nettalabbo_0.5.4-2_all.deb
 ```
 
 APT reads the package's dependencies and installs everything that is missing in the same step. Internet access to the Ubuntu repositories is needed. The package does not download anything from third-party websites.

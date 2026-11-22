@@ -34,7 +34,7 @@ Download the `.deb` release and, from its directory, run:
 
 ```bash
 sudo apt update
-sudo apt install ./nettalabbo_0.5.4-1_all.deb
+sudo apt install ./nettalabbo_0.5.4-2_all.deb
 ```
 
 APT resolves and installs required system packages from your configured Ubuntu repositories. The package uses the identity `nettalabbo` and replaces packages previously named `netlabbo`, `network-laboratory-xubuntu` or `netlab-xubuntu`, preserving personal configuration files for migration. Launch the app from the Xubuntu menu or run:
@@ -86,8 +86,6 @@ Nettalabbo is freely inspired by the *idea* of an accessible network toolkit, in
 
 See [CREDITS.md](CREDITS.md) and [PROVENANCE.md](PROVENANCE.md) for the full statement.
 
-## Publication readiness
+## Contact
 
-Before publishing a public release, see `RELEASE_REVIEW_2026-11-19.md` for the
-limited IP and security audit, `THIRD_PARTY_NOTICES.md` for dependency scope,
-and `TRADEMARK_PRECHECK.md` for pending checks. The GitHub project and its verified public issue URL must be set before issue links can be finalised. The project contact email has been approved as proxybar@gmail.com.
+Feedback and bug reports: [proxybar@gmail.com](mailto:proxybar@gmail.com)

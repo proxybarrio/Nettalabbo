@@ -18,7 +18,7 @@ The program invokes operating system tools provided by Ubuntu packages, includin
 
 The historical NetLab name is used in CREDITS.md for attribution and comparison, not for branding or to claim an official relationship. The development team should keep this separation for future releases.
 
-This documentation records development intent and checks; it is not a legal clearance opinion or a guarantee against an intellectual property claim. Before a larger public release, independent legal review of naming and distribution may be prudent.
+This documentation records development intent and the checks carried out.
 
 ## Scope of the 19 November 2026 source audit
 
