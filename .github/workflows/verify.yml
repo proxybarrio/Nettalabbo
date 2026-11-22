@@ -77,3 +77,57 @@ jobs:
           apt-get install -y /tmp/deb/nettalabbo_*_all.deb
           dpkg-query -W -f='${Package} ${Version} ${Status}\n' nettalabbo
           xvfb-run -a python3 -c "import sys, tkinter; sys.path.insert(0, '/usr/share/nettalabbo'); import nettalabbo; root = tkinter.Tk(); app = nettalabbo.App(root); [app.select_page(p) or root.update() for p in nettalabbo.TABS]; print('Started', nettalabbo.PACKAGE_VERSION, 'with', len(nettalabbo.TABS), 'pages'); root.destroy()"
+
+  publish-deb:
+    # Keeps the Debian package available on GitHub:
+    # - every push to main: the built .deb and SHA256SUMS as a workflow artifact;
+    # - every new version in packaging/control: a GitHub Release v<version>
+    #   with the same two files, which the in-app updater reads.
+    # Runs only after both test jobs have passed.
+    needs: [tests, focal-python38]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v5
+      - name: Build package and checksums
+        run: bash packaging/make_release.sh dist
+      - name: Keep the build as a workflow artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: nettalabbo-deb
+          path: |
+            dist/*.deb
+            dist/SHA256SUMS
+          if-no-files-found: error
+      - name: Publish a GitHub Release for a new version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="$(sed -n 's/^Version: //p' packaging/control | head -n 1)"
+          TAG="v$VERSION"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG already exists; published files are never replaced."
+            echo "Increase Version in packaging/control (and PACKAGE_VERSION) to publish a new one."
+            exit 0
+          fi
+          python3 - "$VERSION" > release-notes.md <<'PY'
+          import re, sys
+          upstream, _, revision = sys.argv[1].partition('-')
+          text = open('CHANGELOG.md', encoding='utf-8').read()
+          heading = re.compile(r'^## ' + re.escape(upstream) + r' Debian revision ' + re.escape(revision) + r'\b.*$', re.M)
+          match = heading.search(text)
+          if match:
+              rest = text[match.end():]
+              end = re.search(r'^## ', rest, re.M)
+              print(rest[:end.start()].strip() if end else rest.strip())
+          else:
+              print('See CHANGELOG.md for the changes in this version.')
+          print()
+          print('Install: `sudo apt install ./nettalabbo_' + sys.argv[1] + '_all.deb`. '
+                'Check the download with `sha256sum -c SHA256SUMS`.')
+          PY
+          gh release create "$TAG" dist/nettalabbo_"$VERSION"_all.deb dist/SHA256SUMS \
+            --target "$GITHUB_SHA" --title "Nettalabbo $VERSION" --notes-file release-notes.md

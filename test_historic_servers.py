@@ -40,3 +40,29 @@ class HistoricServersTests(unittest.TestCase):
         self.assertIn("text='Connect via Telnet'",src)
 
 if __name__=='__main__': unittest.main()
+
+
+class ThirdPartyNoticeTest(unittest.TestCase):
+    def test_notice_in_documents(self):
+        from pathlib import Path
+        here = Path(__file__).resolve().parent
+        for name in ('DISCLAIMER.md', 'CREDITS.md', 'HISTORIC_SERVERS.md'):
+            text = (here / name).read_text(encoding='utf-8')
+            self.assertIn('Third-party services', text, name)
+            self.assertIn('licences', text, name)
+        self.assertIn('DISCLAIMER.md', (here / 'packaging' / 'build_deb.sh').read_text())
+
+    def test_notice_in_catalogue_window(self):
+        from pathlib import Path
+        source = (Path(__file__).resolve().parent / 'nettalabbo.py').read_text(encoding='utf-8')
+        self.assertIn('run by independent third parties', source)
+
+    def test_every_telnet_entry_is_documented(self):
+        from pathlib import Path
+        doc = (Path(__file__).resolve().parent / 'HISTORIC_SERVERS.md').read_text(encoding='utf-8')
+        for item in hs.catalog_groups('telnet'):
+            self.assertIn(item['host'], doc, item['id'])
+
+
+if __name__ == "__main__":
+    unittest.main()

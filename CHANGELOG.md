@@ -14,6 +14,8 @@
 - Telnet: 14 more public Telnet services in the server catalogue (MapSCII world map, Star Wars ASCII animation over IPv6, Wikipedia over Telnet, Doom, a classic Mac desktop demo, Galacticomm and Archaic Binary BBS, Legend of the Red Dragon, Achaea, Avalon, ZombieMUD, Igor MUD, Forgotten Kingdoms), each with its source; listed as online by telnet.org in November 2026, not a live availability guarantee.
 - SSH and Telnet: Ctrl with symbol keys now reaches the remote side, so Ctrl+] opens the telnet> escape prompt (and Ctrl+backslash, Ctrl+[ work); the status line changes from "Connecting" to "Session running" when the session produces output.
 - Verification: a second GitHub Actions job runs every test inside Ubuntu 20.04 with its own Python 3.8 and Tk, then installs the built package with APT and starts it.
+- Legal: a third-party services notice in the server catalogue, DISCLAIMER.md, CREDITS.md and HISTORIC_SERVERS.md: listed BBS, games and other services are run independently by their operators; Nettalabbo only connects to them and does not guarantee that they hold the licences or rights for what they offer.
+- Packaging: GitHub Actions builds the .deb and SHA256SUMS on every push to main (workflow artifact) and publishes a GitHub Release for each new version.
 - Added regression tests and verification workflow for the new components. Live network, SMTP, DNSBL and Xubuntu installation checks are still required before public release.
 
 ## 0.5.3 Debian revision 9 (19 November 2026)

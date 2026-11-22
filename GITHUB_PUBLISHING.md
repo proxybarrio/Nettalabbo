@@ -16,11 +16,13 @@ This repository is an experimental software project under the MIT License. Autho
 
 The updater in Nettalabbo reads `https://api.github.com/repos/proxybarrio/nettalabbo/releases/latest`. It only works when the repository (or at least its releases) is public; while it is private, users see "No public release found".
 
-For each release:
+Publishing is automatic. On every push to `main`, after the tests and the Ubuntu 20.04 job pass, the `publish-deb` job of `.github/workflows/verify.yml`:
 
-1. Increase `Version:` in `packaging/control` and `PACKAGE_VERSION` in `nettalabbo.py` to the same value (a test enforces this).
-2. Run `bash packaging/make_release.sh`. It writes `dist/nettalabbo_<version>_all.deb` and `dist/SHA256SUMS`.
-3. Create a GitHub Release whose tag is `v<version>` (for example `v0.5.3-9`), not marked as draft or pre-release, with exactly those two files attached. The script prints the `gh release create` command.
+1. builds `nettalabbo_<version>_all.deb` and `SHA256SUMS` with `packaging/make_release.sh`;
+2. keeps them as the `nettalabbo-deb` artifact of that workflow run (latest build of `main`);
+3. creates the GitHub Release `v<version>` with those two files and the matching CHANGELOG section, when that version has not been released yet. Existing releases are never overwritten.
+
+To publish a new version, increase `Version:` in `packaging/control` and `PACKAGE_VERSION` in `nettalabbo.py` to the same value (a test enforces this), add its CHANGELOG section, and push to `main`. `bash packaging/make_release.sh` still builds the same files locally.
 
 The checksum protects against corrupted or substituted downloads, but both files come from the same GitHub account. Protect that account with two-factor authentication. A signing key embedded in the application would be the next step if stronger guarantees are needed.
 

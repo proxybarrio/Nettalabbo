@@ -1612,7 +1612,12 @@ class App:
         ttk.Label(main, text='Historic Servers', font=('Sans', 14, 'bold')).pack(anchor='w')
         ttk.Label(main, text=('Select a historic service, then choose SSH or Telnet. '
                      'The list is informational; network availability has not been confirmed. '
-                     'Accounts may be required.'), wraplength=920).pack(anchor='w', pady=(3, 8))
+                     'Accounts may be required.'), wraplength=920).pack(anchor='w', pady=(3, 2))
+        ttk.Label(main, text=('These services are run by independent third parties. Nettalabbo only '
+                     'connects you to them and does not guarantee that they hold the licences or '
+                     'rights for the games, software or content they offer; that responsibility '
+                     'stays with each operator. Full notice: About, Experimental Software & Disclaimer.'),
+                  wraplength=920, foreground='#7a4b00').pack(anchor='w', pady=(0, 8))
         notebook = ttk.Notebook(main)
         notebook.pack(fill='both', expand=True)
         tree_by_group = {}

@@ -1,7 +1,15 @@
 # Historic Servers reference catalog
 
 These addresses were cross-checked against official/public documentation on
-18 November 2026. They have **not** all been verified by live network connection.
+18 November 2026, and the additional Telnet services against the telnet.org list
+updated on 11 November 2026. They have **not** all been verified by live network
+connection.
+
+**Third-party services.** Every service below is run independently by its own
+operator. Nettalabbo only provides the address and opens a connection when asked;
+it does not host or control these services and does not guarantee that their
+operators hold the licences or rights for the games, software or content they
+offer. That responsibility stays with each operator. See DISCLAIMER.md.
 
 ## Telnet / BBS
 
@@ -12,6 +20,20 @@ These addresses were cross-checked against official/public documentation on
 | FICS | freechess.org | 5000 | https://freechess.org/ |
 | Aardwolf | aardmud.org | 4000 | https://www.aardwolf.com/play/index.htm |
 | BatMUD | batmud.bat.org | 23 | https://www.bat.org/client-plugins |
+| MapSCII | mapscii.me | 23 | https://github.com/rastapasta/mapscii |
+| Star Wars ASCII (IPv6 only) | towel.blinkenlights.nl | 23 | https://telnet.org/htm/places.htm |
+| Wikipedia over Telnet | telnet.wiki.gd | 23 | https://telnet.org/htm/places.htm |
+| Doom in the terminal | doom.w-graj.net | 666 | https://telnet.org/htm/places.htm |
+| Classic Mac desktop demo | www.vintagecomputing.com | 1984 | https://telnet.org/htm/places.htm |
+| NyanCat alternative | halite.md.vc | 23 | https://telnet.org/htm/places.htm |
+| Galacticomm BBS | gcomm.com | 23 | https://telnet.org/htm/places.htm |
+| Archaic Binary BBS | bbs.archaicbinary.net | 23 | https://telnet.org/htm/places.htm |
+| Legend of the Red Dragon | lord.stabs.org | 23 | https://telnet.org/htm/places.htm |
+| Achaea | achaea.com | 23 | https://www.achaea.com/ |
+| Avalon | avalon-rpg.com | 23 | https://telnet.org/htm/places.htm |
+| ZombieMUD | zombiemud.org | 23 | https://telnet.org/htm/places.htm |
+| Igor MUD | igormud.org | 1701 | https://telnet.org/htm/places.htm |
+| Forgotten Kingdoms | forgottenkingdoms.org | 4000 | https://telnet.org/htm/places.htm |
 
 ## UNIX / SSH
 
