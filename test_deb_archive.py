@@ -12,6 +12,6 @@ class DebianArchiveTests(unittest.TestCase):
         self.assertIn('DEBIAN/md5sums', script)
         self.assertIn('-Zgzip', script)
     def test_version_and_install_guidance(self):
-        self.assertIn('Version: 0.5.4-3', (ROOT / 'packaging/control').read_text())
-        self.assertIn('sudo apt install ./nettalabbo_0.5.4-3_all.deb', (ROOT / 'INSTALL_XUBUNTU.md').read_text())
+        self.assertIn('Version: 0.5.4-4', (ROOT / 'packaging/control').read_text())
+        self.assertIn('sudo apt install ./nettalabbo_0.5.4-4_all.deb', (ROOT / 'INSTALL_XUBUNTU.md').read_text())
 if __name__ == '__main__': unittest.main()

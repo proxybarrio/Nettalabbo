@@ -1,4 +1,4 @@
-# Legacy & Alternative Networks in Nettalabbo 0.5.3
+# Legacy & Alternative Networks in Nettalabbo 0.5.4
 
 The Legacy Navigator provides explicitly triggered and bounded protocol tools.
 There is no automatic browsing at startup and no remote code execution.
@@ -15,6 +15,22 @@ Links to HTTP/HTTPS sites are opened externally only with confirmation.
 'Raw' shows the actual response bytes when retained or explicitly warns when
 only the decoded body is available. 'Stop' closes active sockets used by the
 common TCP adapter; other adapters use bounded network timeouts.
+
+### Reading size, files and questions (0.5.4)
+
+* **Text size:** the **A−** and **A+** buttons (or Ctrl + / Ctrl − / Ctrl 0)
+  change the reading size from 8 to 28 points; the default is 12 and the
+  choice is remembered. The text stays monospaced, so Gopher menus and ASCII
+  art stay aligned.
+* **Files:** Gopher items of file types (5, 9, g, I, s, ;, d, p, P, <),
+  Gopher documents that contain binary data, and Gemini responses with a
+  non-text MIME type are treated as files, up to 20 MB, kept in memory until
+  you choose **Save file** (or **Save**). GIF and PNG images are previewed in
+  the page; other formats are offered for saving. **Raw** shows the first
+  bytes as a hex dump. An incomplete download is clearly marked.
+* **Gemini questions:** status 10 asks for text and status 11 for sensitive
+  input (typed hidden); the answer is sent back as the URL query, as the
+  Gemini specification requires. Cancelling leaves the page unchanged.
 
 
 ## Present in Nettalabbo

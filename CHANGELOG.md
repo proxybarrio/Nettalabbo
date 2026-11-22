@@ -1,3 +1,10 @@
+## 0.5.4 Debian revision 4 (22 November 2026)
+
+- Legacy Navigator: adjustable text size with A− / A+ (and Ctrl + / Ctrl − / Ctrl 0), 8 to 28 points, default raised from 10 to 12, remembered between sessions; the text stays monospaced so Gopher menus and ASCII art stay aligned.
+- Legacy Navigator: Gopher file items (images, archives, binaries, sound, PDF), Gopher documents containing binary data and Gemini non-text responses are handled as files up to 20 MB instead of being shown as garbled text: name, type and size, Save file, GIF/PNG preview in the page, hex dump in Raw, incomplete downloads clearly marked.
+- Gemini: status 10 and 11 input requests now ask the question (11 with hidden typing) and repeat the request with the answer, so Gemini search engines work; cancelling is reported.
+- Gemini: very large text pages are shown up to 300 KB so the window stays responsive.
+
 ## 0.5.4 Debian revision 3 (22 November 2026)
 
 - Trace: new built-in tracer for the Auto, UDP and ICMP methods. It works for normal users on every supported Ubuntu release, without root rights and without depending on the installed traceroute version. Before, the default ICMP method ran `traceroute -I`, which as a normal user either needs privileges or, with some traceroute versions and kernels, returns only asterisks.

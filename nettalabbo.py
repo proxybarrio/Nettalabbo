@@ -5,6 +5,8 @@ No binary code or graphical assets from NetLab 1.4 are included.
 Python 3 and tkinter are required. External ping/traceroute executables are used.
 """
 from __future__ import annotations
+import base64
+import posixpath
 import concurrent.futures
 import datetime as dt
 import errno
@@ -42,11 +44,11 @@ from historic_servers import HISTORIC_SERVERS, catalog_groups, get_entry, connec
 from about_documents import load_about_document, ABOUT_DOCUMENTS
 from legacy_view import segments as legacy_segments, raw_text as legacy_raw_text, distinct_links as legacy_distinct_links
 from legacy_theme import THEME_NAMES as LEGACY_THEME_NAMES, palette as legacy_palette, link_legend as legacy_link_legend
-from urllib.parse import urlsplit, urlunsplit, quote as url_quote
+from urllib.parse import urlsplit, urlunsplit, quote as url_quote, unquote as url_unquote
 import webbrowser
 
 VERSION = '0.5.4'
-PACKAGE_VERSION = '0.5.4-3'  # must match packaging/control
+PACKAGE_VERSION = '0.5.4-4'  # must match packaging/control
 APP_DIR = Path.home() / '.config' / 'nettalabbo'
 ASSETS_DIR = Path(__file__).resolve().parent / 'assets'
 LEGACY_SETTINGS_FILES = [
@@ -2031,9 +2033,13 @@ class App:
         ttk.Combobox(action, textvariable=self.legacy_theme, values=LEGACY_THEME_NAMES,
                      state='readonly', width=12).pack(side='left', padx=(0, 8))
         self.legacy_theme.trace_add('write', lambda *_: self.legacy_colour_changed())
+        ttk.Label(action, text='Text:').pack(side='left', padx=(2, 3))
+        ttk.Button(action, text='A−', width=3, command=lambda: self.legacy_zoom(-1)).pack(side='left')
+        ttk.Button(action, text='A+', width=3, command=lambda: self.legacy_zoom(+1)).pack(side='left', padx=(2, 8))
         ttk.Button(action, text='Sample servers...', command=self.legacy_example_dialog).pack(side='left', padx=(0, 5))
         ttk.Button(action, text='Copy', command=lambda: self.copy_output(page)).pack(side='left', padx=5)
-        ttk.Button(action, text='Save', command=lambda: self.save_output(page)).pack(side='left')
+        ttk.Button(action, text='Save', command=lambda: (self.legacy_save_file() if getattr(
+            self.legacy_current_result, 'is_file', False) else self.save_output(page))).pack(side='left')
         self.legacy_links_menu = tk.Menu(self.root, tearoff=False)
         self.legacy_links_button = ttk.Menubutton(action, text='Links (0) ▾', direction='below', menu=self.legacy_links_menu)
         self.legacy_links_button.pack(side='right')
@@ -2067,7 +2073,79 @@ class App:
         self.legacy_status_detail = tk.StringVar(value=legacy_link_legend(self.legacy_theme.get()))
         ttk.Label(f, textvariable=self.legacy_status_detail, foreground='#537284').pack(anchor='w', pady=(0, 3))
         self.text_output(f, page)
+        self.legacy_apply_font()
+        for sequence, step in (('<Control-plus>', 1), ('<Control-equal>', 1), ('<Control-KP_Add>', 1),
+                               ('<Control-minus>', -1), ('<Control-KP_Subtract>', -1), ('<Control-0>', 0)):
+            for widget in (self.output[page], self.legacy_url):
+                widget.bind(sequence, lambda e, s=step: (self.legacy_zoom(s), 'break')[1])
         self.legacy_update_navigation()
+
+    LEGACY_FONT_DEFAULT, LEGACY_FONT_MIN, LEGACY_FONT_MAX = 12, 8, 28
+
+    def legacy_font_size(self):
+        try:
+            size = int(self.settings.get('legacy_font_size', self.LEGACY_FONT_DEFAULT))
+        except (TypeError, ValueError):
+            size = self.LEGACY_FONT_DEFAULT
+        return max(self.LEGACY_FONT_MIN, min(self.LEGACY_FONT_MAX, size))
+
+    def legacy_apply_font(self):
+        """Monospaced text keeps Gopher menus and ASCII art aligned at any size."""
+        size = self.legacy_font_size()
+        w = self.output.get('Legacy Navigator')
+        if w is None:
+            return
+        w.configure(font=('DejaVu Sans Mono', size))
+        w.tag_configure('legacy_heading', font=('DejaVu Sans', size + 2, 'bold'))
+        w.tag_configure('legacy_file_title', font=('DejaVu Sans', size + 1, 'bold'))
+
+    def legacy_zoom(self, step):
+        """Change the reading size (step 0 restores the default); remembered between sessions."""
+        size = self.LEGACY_FONT_DEFAULT if step == 0 else self.legacy_font_size() + step
+        size = max(self.LEGACY_FONT_MIN, min(self.LEGACY_FONT_MAX, size))
+        self.settings['legacy_font_size'] = size
+        self.persist()
+        self.legacy_apply_font()
+        self.legacy_redraw()
+        self.set_status('Legacy Navigator', f'Text size {size} pt  (Ctrl + / Ctrl − / Ctrl 0)')
+
+    def legacy_file_name(self, result):
+        name = posixpath.basename(urlsplit(result.address).path.rstrip('/')) or 'download'
+        name = re.sub(r'[^A-Za-z0-9._-]', '_', url_unquote(name))[:80] or 'download'
+        extensions = {'image/gif': '.gif', 'image/png': '.png', 'image/jpeg': '.jpg', 'application/pdf': '.pdf',
+                      'application/zip': '.zip', 'application/gzip': '.gz', 'audio/mpeg': '.mp3',
+                      'audio/x-wav': '.wav', 'audio/ogg': '.ogg', 'image/bmp': '.bmp'}
+        extension = extensions.get(result.media_type, '')
+        if extension and not name.lower().endswith(extension):
+            name += extension
+        return name
+
+    def legacy_save_file(self, result=None):
+        result = result or self.legacy_current_result
+        if not result or not getattr(result, 'is_file', False):
+            return
+        if result.truncated and not messagebox.askyesno('Incomplete file',
+                'The download stopped at the size limit, so this file is incomplete. Save it anyway?',
+                parent=self.root):
+            return
+        path = filedialog.asksaveasfilename(parent=self.root, initialfile=self.legacy_file_name(result),
+                                            filetypes=[('All files', '*')])
+        if path:
+            Path(path).write_bytes(result.raw_response)
+            self.set_status('Legacy Navigator', f'Saved {len(result.raw_response):,} bytes: {path}')
+
+    def legacy_preview_image(self, result, max_width=900):
+        """Tk shows GIF and PNG natively; other images are offered for saving only."""
+        if result.media_type not in ('image/gif', 'image/png') or result.truncated:
+            return None
+        if len(result.raw_response) > 8_000_000:
+            return None
+        try:
+            image = tk.PhotoImage(data=base64.b64encode(result.raw_response).decode('ascii'))
+        except tk.TclError:
+            return None
+        factor = max(1, -(-image.width() // max_width))
+        return image.subsample(factor, factor) if factor > 1 else image
 
     def legacy_toggle_catalog(self):
         if self.legacy_catalog_visible.get():
@@ -2195,10 +2273,14 @@ class App:
         else:
             w.configure(background=colours['background'], foreground=colours['foreground'],
                         insertbackground=colours['foreground'])
-            w.tag_configure('legacy_heading', font=('Sans', 12, 'bold'), foreground=colours['heading'], spacing1=8)
+            w.tag_configure('legacy_heading', foreground=colours['heading'], spacing1=8)
             w.tag_configure('legacy_info', foreground=colours['info'])
+            self.legacy_apply_font()
             w.insert('end', '{}  ·  {}  ·  {} bytes\n\n'.format(result.protocol.upper(), result.status, result.bytes_received), 'legacy_info')
-            for index, (kind, label, destination) in enumerate(legacy_segments(result)):
+            if getattr(result, 'is_file', False):
+                self.legacy_show_file(w, result, colours)
+            for index, (kind, label, destination) in enumerate(
+                    [] if getattr(result, 'is_file', False) else legacy_segments(result)):
                 if not destination:
                     w.insert('end', label, 'legacy_heading' if kind == 'heading' else 'legacy_info' if kind == 'info' else ())
                     continue
@@ -2226,6 +2308,27 @@ class App:
                                            state=('normal' if links else 'disabled'))
         self.legacy_detail.set('Click underlined links, including URLs in text documents.  {} link(s) found.'.format(len(links)))
         self.legacy_status_detail.set(legacy_link_legend(self.legacy_theme.get()))
+
+    def legacy_show_file(self, w, result, colours):
+        w.tag_configure('legacy_file_title', foreground=colours['heading'])
+        w.insert('end', 'File: {}\n'.format(self.legacy_file_name(result)), 'legacy_file_title')
+        w.insert('end', '{}  ·  {:,} bytes\n'.format(result.media_type, len(result.raw_response)), 'legacy_info')
+        if result.truncated:
+            w.insert('end', 'The download stopped at the size limit: this file is incomplete.\n', 'legacy_info')
+        w.insert('end', '\n')
+        w.tag_configure('legacy_save_file', foreground=colours['document'], underline=1)
+        w.insert('end', '💾 Save file…', 'legacy_save_file')
+        w.tag_bind('legacy_save_file', '<Button-1>', lambda e: self.legacy_save_file(result))
+        w.tag_bind('legacy_save_file', '<Enter>', lambda e: w.configure(cursor='hand2'))
+        w.tag_bind('legacy_save_file', '<Leave>', lambda e: w.configure(cursor='xterm'))
+        w.insert('end', '\n\n')
+        image = self.legacy_preview_image(result)
+        if image is not None:
+            self.legacy_image = image  # keep a reference, or Tk discards the picture
+            w.image_create('end', image=image)
+            w.insert('end', '\n')
+        elif result.media_type.startswith('image/'):
+            w.insert('end', 'Preview is available for GIF and PNG images; save this file to open it.\n', 'legacy_info')
 
     def legacy_example_dialog(self):
         # Public reference endpoints only; individual services may change or become unavailable.
@@ -2273,7 +2376,31 @@ class App:
     def legacy_deliver(self, result, stop):
         task = self.tasks.get('Legacy Navigator')
         if task and task[0] is stop and not stop.is_set():
+            if getattr(result, 'input_prompt', ''):
+                self.legacy_ask_input(result)
+                return
             self.legacy_render(result)
+
+    def legacy_ask_input(self, result):
+        """Gemini status 10/11: ask the user, then repeat the request with the answer as query."""
+        host = urlsplit(result.address).hostname or ''
+        answer = simpledialog.askstring(
+            'Sensitive input requested' if result.input_sensitive else 'Input requested',
+            '{} asks:\n\n{}'.format(host, result.input_prompt[:400]),
+            show='*' if result.input_sensitive else None, parent=self.root)
+        if answer is None:
+            self.legacy_render(result)
+            # The request is still finishing: its final status must say what happened.
+            self.task_outcomes['Legacy Navigator'] = 'Input cancelled.'
+            return
+        parts = urlsplit(result.address)
+        target = urlunsplit((parts.scheme, parts.netloc, parts.path or '/', url_quote(answer, safe=''), ''))
+        if len(target.encode('utf-8')) > 1024:
+            messagebox.showerror('Input too long', 'The answer makes the address longer than the 1024 bytes '
+                                 'allowed by Gemini. Please shorten it.', parent=self.root)
+            self.legacy_render(result)
+            return
+        self.legacy_navigate(target)
 
     def legacy_render(self, result):
         page = 'Legacy Navigator'

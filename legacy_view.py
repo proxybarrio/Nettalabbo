@@ -165,11 +165,24 @@ def raw_text(result):
     reconstruct the unmodified response when a parser discarded metadata.
     """
     wire = getattr(result, 'raw_response', b'')
+    if getattr(result, 'is_file', False):
+        return file_hex_dump(wire)
     if wire:
         return wire.decode('utf-8', errors='replace')
     return ('Raw transport bytes were not retained by this protocol adapter.\n'
             'The following is the decoded response body, without formatting.\n\n'
             + (result.content or ''))
+
+
+def file_hex_dump(data, limit=512):
+    """First bytes of a file as a classic hex dump (offset, hex, printable)."""
+    lines = ['File, {:,} bytes. First {} bytes:'.format(len(data), min(limit, len(data))), '']
+    for offset in range(0, min(limit, len(data)), 16):
+        chunk = data[offset:offset + 16]
+        hexpart = ' '.join('{:02x}'.format(b) for b in chunk)
+        text = ''.join(chr(b) if 32 <= b < 127 else '.' for b in chunk)
+        lines.append('{:08x}  {:<47}  {}'.format(offset, hexpart, text))
+    return '\n'.join(lines) + '\n'
 
 
 def link_color(kind):

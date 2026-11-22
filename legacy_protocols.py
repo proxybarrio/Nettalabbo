@@ -17,6 +17,11 @@ from urllib.parse import urlsplit, urlunsplit, quote, unquote
 TIMEOUT=8
 _fetch_state=threading.local()  # per-worker cancellation; never share between requests
 MAX_BYTES=300_000
+# Files (images, archives, PDFs) may be larger than text pages; they are only
+# kept in memory and written to disk when the user chooses Save file.
+MAX_FILE_BYTES=20_000_000
+# Gopher item types that carry files rather than text (RFC 1436 and common use).
+GOPHER_FILE_TYPES={'5','9','g','I','s',';','d','p','P','<'}
 MAX_LINES=350
 
 # mode: read, remote, upload, reference. A reference entry must not claim to work.
@@ -60,6 +65,13 @@ class LegacyResult:
     links: list=field(default_factory=list)
     bytes_received: int=0
     raw_response: bytes=b''
+    # File downloads: content holds a description, raw_response the file bytes.
+    is_file: bool=False
+    media_type: str=''
+    truncated: bool=False
+    # Gemini input request (status 10/11): prompt text and whether it is sensitive.
+    input_prompt: str=''
+    input_sensitive: bool=False
 
 
 def parse_url(address):
@@ -92,7 +104,7 @@ def read_limited(sock, limit=MAX_BYTES):
     return b''.join(chunks)
 
 
-def tcp_fetch(host, port, request=None, tls=False, pins=None, scheme=''):
+def tcp_fetch(host, port, request=None, tls=False, pins=None, scheme='', limit=MAX_BYTES):
     """Close sockets promptly, preserve TLS checks, permit request cancellation."""
     stop = getattr(_fetch_state, 'stop', None)
     done = threading.Event()
@@ -128,7 +140,7 @@ def tcp_fetch(host, port, request=None, tls=False, pins=None, scheme=''):
         if not tls:
             with open_socket(True) as sock:
                 if request is not None: sock.sendall(request)
-                return read_limited(sock)
+                return read_limited(sock, limit)
         try: sock=open_socket(True)
         except ssl.SSLCertVerificationError:
             # TOFU is an explicit consent step, never silently trusted. Existing pins are rechecked.
@@ -142,7 +154,7 @@ def tcp_fetch(host, port, request=None, tls=False, pins=None, scheme=''):
                 sock.close(); raise LegacyError('TLS certificate CHANGED for {}! Disconnecting.'.format(origin))
         with sock:
             if request is not None: sock.sendall(request)
-            return read_limited(sock)
+            return read_limited(sock, limit)
     finally:
         done.set()
 
@@ -182,6 +194,18 @@ def status_response(raw,address,scheme,scroll=False):
     match=re.match(r'^(\d\d)\s(.*)$',info)
     if not match: raise LegacyError('Malformed response header: '+info[:90])
     code, meta=match.groups()
+    if code.startswith('1'):
+        result=LegacyResult(address,scheme,code+' '+meta,'',[],len(raw),raw)
+        result.input_prompt=meta.strip() or 'Input requested'
+        result.input_sensitive=(code=='11')
+        return result
+    mime=meta.split(';',1)[0].strip().lower()
+    if code.startswith('2') and mime and not mime.startswith('text/') and not scroll:
+        return file_result(address,scheme,code+' '+meta,body,mime,len(raw),
+                           limit=MAX_FILE_BYTES-len(header)-2)
+    if len(body)>MAX_BYTES:
+        body=body[:MAX_BYTES]
+        meta+=' (shown up to {:,} bytes)'.format(MAX_BYTES)
     if scroll and code.startswith('2'):
         lines=body.split(b'\r\n',3)
         if len(lines)>=4:
@@ -193,6 +217,33 @@ def status_response(raw,address,scheme,scroll=False):
     return LegacyResult(address,scheme,code+' '+meta,content,links,len(raw),raw)
 
 
+def sniff_media_type(data):
+    """Recognise common file signatures (used for previews and file names)."""
+    signatures=((b'GIF87a','image/gif'),(b'GIF89a','image/gif'),(b'\x89PNG\r\n\x1a\n','image/png'),
+                (b'\xff\xd8\xff','image/jpeg'),(b'%PDF-','application/pdf'),(b'PK\x03\x04','application/zip'),
+                (b'\x1f\x8b','application/gzip'),(b'ID3','audio/mpeg'),(b'RIFF','audio/x-wav'),
+                (b'OggS','audio/ogg'),(b'BM','image/bmp'))
+    for magic,media in signatures:
+        if data.startswith(magic):
+            return media
+    return 'application/octet-stream'
+
+
+def file_result(address,scheme,status,data,media_type='',received=None,limit=None):
+    media=media_type or sniff_media_type(data)
+    if media=='application/octet-stream':
+        media=sniff_media_type(data)
+    truncated=len(data)>=(MAX_FILE_BYTES if limit is None else limit)
+    size=len(data)
+    note=('File: {} ({:,} bytes){}.\nUse Save file to store it on your computer.'
+          .format(media,size,'; download stopped at the size limit, the file is incomplete' if truncated else ''))
+    result=LegacyResult(address,scheme,status,note,[],received if received is not None else size,data)
+    result.is_file=True
+    result.media_type=media
+    result.truncated=truncated
+    return result
+
+
 def gopher_fetch(p,scheme,port,pins):
     # RFC 1436: /<item-type><selector>, with a CRLF-terminated selector request.
     path=unquote(p.path)
@@ -200,7 +251,11 @@ def gopher_fetch(p,scheme,port,pins):
     selector=path[2:] if len(path)>1 else ''
     if '\r' in selector or '\n' in selector: raise LegacyError('Invalid Gopher selector.')
     if p.query: selector+='\t'+unquote(p.query)
-    raw=tcp_fetch(p.hostname,port,(selector+'\r\n').encode('utf-8'),scheme=='gophers',pins,scheme)
+    is_file_type=itemtype in GOPHER_FILE_TYPES
+    limit=MAX_FILE_BYTES if is_file_type else MAX_BYTES
+    raw=tcp_fetch(p.hostname,port,(selector+'\r\n').encode('utf-8'),scheme=='gophers',pins,scheme,limit)
+    if is_file_type or (itemtype not in ('1','7') and b'\x00' in raw[:4096]):
+        return file_result(p.geturl(),scheme,'Gopher file (item type {})'.format(itemtype),raw,limit=limit)
     if itemtype not in ('1','7'):
         return LegacyResult(p.geturl(),scheme,'Document',safe_text(raw),[],len(raw),raw)
     links=[]
@@ -407,7 +462,7 @@ def _fetch_dispatch(address, pins=None):
         if scheme=='scroll': req=(address+' en\r\n').encode('utf-8')
         else: req=(address+'\r\n').encode('utf-8')
         use_tls=scheme in ('gemini','scroll')
-        raw=tcp_fetch(p.hostname,port,req,use_tls,pins,scheme)
+        raw=tcp_fetch(p.hostname,port,req,use_tls,pins,scheme,MAX_FILE_BYTES)
         return status_response(raw,address,scheme,scroll=scheme=='scroll')
     raise LegacyError('No compatible adapter for '+scheme)
 
