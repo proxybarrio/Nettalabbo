@@ -1,3 +1,8 @@
+## 0.5.4 Debian revision 5 (22 November 2026)
+
+- Legacy Navigator: new start page that lists every service in plain words, grouped by what you can do with it (ready to browse, experimental, interactive terminals, upload, not yet available), with a one-click index at the top and clickable public examples (Gopher, Gemini and a Gemini search engine, Spartan, Finger weather, DICT, anonymous FTP, Usenet, Nex). It opens with the page and returns with the new ☰ Services button, or with Home when no address is entered; Back returns to the last page visited.
+- Legacy Navigator: the hidden "Protocol directory" table is replaced by the start page.
+
 ## 0.5.4 Debian revision 4 (22 November 2026)
 
 - Legacy Navigator: adjustable text size with A− / A+ (and Ctrl + / Ctrl − / Ctrl 0), 8 to 28 points, default raised from 10 to 12, remembered between sessions; the text stays monospaced so Gopher menus and ASCII art stay aligned.

@@ -33,7 +33,8 @@ from domain_rdap import lookup_domain, LookupError, normalise_domain
 from remote_terminal import PtySession, TerminalScreen, connection_command
 from terminal_colours import ColourTerminalScreen
 from diagnose import diagnose as run_domain_diagnose
-from legacy_protocols import CATALOG, SCHEMES, fetch as legacy_fetch, parse_url as parse_legacy_url, TrustRequired, LegacyError, titan_upload
+from legacy_directory import services_by_group, anchor as legacy_anchor, NO_EXAMPLE as LEGACY_NO_EXAMPLE
+from legacy_protocols import SCHEMES, fetch as legacy_fetch, parse_url as parse_legacy_url, TrustRequired, LegacyError, titan_upload
 from mail_inspector import inspect_address, normalise_email, test_mail_service, MailInspectionError
 import time_services
 import service_catalog
@@ -48,7 +49,7 @@ from urllib.parse import urlsplit, urlunsplit, quote as url_quote, unquote as ur
 import webbrowser
 
 VERSION = '0.5.4'
-PACKAGE_VERSION = '0.5.4-4'  # must match packaging/control
+PACKAGE_VERSION = '0.5.4-5'  # must match packaging/control
 APP_DIR = Path.home() / '.config' / 'nettalabbo'
 ASSETS_DIR = Path(__file__).resolve().parent / 'assets'
 LEGACY_SETTINGS_FILES = [
@@ -236,6 +237,7 @@ class App:
         self.legacy_history = []  # cached documents for Back/Forward without new network traffic
         self.legacy_history_position = -1
         self.legacy_current_result = None
+        self.legacy_showing_directory = False
         self.settings = self.read_settings()
         self.style = ttk.Style(root)
         if 'clam' in self.style.theme_names():
@@ -2012,7 +2014,8 @@ class App:
         self.legacy_back_button.pack(side='left', padx=(0, 3))
         self.legacy_forward_button = ttk.Button(nav, text='Forward ▶', command=self.legacy_forward, width=10)
         self.legacy_forward_button.pack(side='left', padx=(0, 3))
-        ttk.Button(nav, text='⌂ Home', command=self.legacy_home, width=8).pack(side='left', padx=(0, 7))
+        ttk.Button(nav, text='⌂ Home', command=self.legacy_home, width=8).pack(side='left', padx=(0, 3))
+        ttk.Button(nav, text='☰ Services', command=self.legacy_show_directory, width=11).pack(side='left', padx=(0, 7))
         self.legacy_url = self.input_combobox(nav, page, 'legacy_url', width=43)
         self.legacy_url.pack(side='left', fill='x', expand=True, padx=(0, 5))
         self.legacy_url.bind('<Return>', lambda e: self.execute_legacy())
@@ -2046,27 +2049,7 @@ class App:
         self.legacy_links_button.configure(state='disabled')
         ttk.Button(action, text='Titan upload...', command=self.legacy_titan_dialog).pack(side='right', padx=(4, 8))
         ttk.Button(action, text='SSH / Telnet', command=self.open_legacy_remote).pack(side='right', padx=4)
-        catalog_box = ttk.Frame(f)
-        catalog_box.pack(fill='x', pady=(0, 5))
-        self.legacy_catalog_visible = tk.BooleanVar(value=False)
-        ttk.Checkbutton(catalog_box, text='Protocol directory', variable=self.legacy_catalog_visible,
-                        command=self.legacy_toggle_catalog).pack(anchor='w')
-        self.legacy_catalog_frame = ttk.LabelFrame(catalog_box, text='Available and experimental protocols', padding=5)
-        self.legacy_catalog = ttk.Treeview(self.legacy_catalog_frame,
-                       columns=('protocol','scheme','port','capability'), show='headings', height=4)
-        for key, title, width in [('protocol','Protocol',115),('scheme','URI schemes',145),('port','Port',58),('capability','Capability',140)]:
-            self.legacy_catalog.heading(key, text=title)
-            self.legacy_catalog.column(key, width=width, stretch=(key in ('protocol', 'scheme')))
-        for title, schemes, port, mode, description in CATALOG:
-            capability = {'read':'Read client','remote':'In-app terminal','upload':'Upload client','reference':'Future release'}[mode]
-            self.legacy_catalog.insert('', 'end', values=(title, ', '.join(x+'://' for x in schemes),
-                                                             str(port or 'varies'), capability))
-        catalog_scroll = ttk.Scrollbar(self.legacy_catalog_frame, orient='vertical', command=self.legacy_catalog.yview)
-        self.legacy_catalog.configure(yscrollcommand=catalog_scroll.set)
-        catalog_scroll.pack(side='right', fill='y')
-        self.legacy_catalog.pack(side='left', fill='x', expand=True)
-        self.legacy_catalog.bind('<<TreeviewSelect>>', self.legacy_catalog_selected)
-        self.legacy_detail = tk.StringVar(value='Choose a protocol or enter its URL above.')
+        self.legacy_detail = tk.StringVar(value='Choose a service below or enter its address above.')
         ttk.Label(f, textvariable=self.legacy_detail, wraplength=760).pack(anchor='w', pady=(0, 5))
         self.status[page] = tk.StringVar(value='Ready. Press Go or Enter to navigate.')
         ttk.Label(f, textvariable=self.status[page]).pack(anchor='w', pady=(0, 3))
@@ -2079,6 +2062,7 @@ class App:
             for widget in (self.output[page], self.legacy_url):
                 widget.bind(sequence, lambda e, s=step: (self.legacy_zoom(s), 'break')[1])
         self.legacy_update_navigation()
+        self.legacy_show_directory()
 
     LEGACY_FONT_DEFAULT, LEGACY_FONT_MIN, LEGACY_FONT_MAX = 12, 8, 28
 
@@ -2098,6 +2082,7 @@ class App:
         w.configure(font=('DejaVu Sans Mono', size))
         w.tag_configure('legacy_heading', font=('DejaVu Sans', size + 2, 'bold'))
         w.tag_configure('legacy_file_title', font=('DejaVu Sans', size + 1, 'bold'))
+        w.tag_configure('legacy_service', font=('DejaVu Sans', size + 1, 'bold'))
 
     def legacy_zoom(self, step):
         """Change the reading size (step 0 restores the default); remembered between sessions."""
@@ -2147,18 +2132,15 @@ class App:
         factor = max(1, -(-image.width() // max_width))
         return image.subsample(factor, factor) if factor > 1 else image
 
-    def legacy_toggle_catalog(self):
-        if self.legacy_catalog_visible.get():
-            self.legacy_catalog_frame.pack(fill='x', pady=(0, 5))
-        else:
-            self.legacy_catalog_frame.pack_forget()
-
     def legacy_update_navigation(self):
-        self.legacy_back_button.configure(state=('normal' if self.legacy_history_position > 0 else 'disabled'))
+        can_go_back = self.legacy_history_position > 0 or (self.legacy_showing_directory and bool(self.legacy_history))
+        self.legacy_back_button.configure(state=('normal' if can_go_back else 'disabled'))
         self.legacy_forward_button.configure(state=('normal' if self.legacy_history_position + 1 < len(self.legacy_history) else 'disabled'))
 
     def legacy_back(self):
-        if self.legacy_history_position > 0:
+        if self.legacy_showing_directory and self.legacy_history:
+            self.legacy_restore_history()
+        elif self.legacy_history_position > 0:
             self.legacy_history_position -= 1
             self.legacy_restore_history()
 
@@ -2180,7 +2162,7 @@ class App:
         try:
             parsed, scheme, port = parse_legacy_url(address)
         except LegacyError:
-            self.legacy_example_dialog()
+            self.legacy_show_directory()
             return
         # Use the selected protocol's root. Gopher root is menu selector /1.
         home_path = '/1' if scheme in ('gopher', 'gophers') else '/'
@@ -2255,13 +2237,17 @@ class App:
         self.legacy_redraw()
 
     def legacy_redraw(self):
-        if self.legacy_current_result:
+        if self.legacy_showing_directory:
+            self.legacy_show_directory()
+        elif self.legacy_current_result:
             self.legacy_show_result(self.legacy_current_result)
 
     def legacy_show_result(self, result):
         """Render coloured, always-underlined links into a read-only Tk Text widget."""
         page = 'Legacy Navigator'
         self.legacy_current_result = result
+        self.legacy_showing_directory = False
+        self.legacy_update_navigation()
         w = self.output[page]
         w.configure(state='normal')
         w.delete('1.0', 'end')
@@ -2330,6 +2316,88 @@ class App:
         elif result.media_type.startswith('image/'):
             w.insert('end', 'Preview is available for GIF and PNG images; save this file to open it.\n', 'legacy_info')
 
+    def legacy_show_directory(self):
+        """Start page: every service in plain words, grouped by what you can do with it."""
+        page = 'Legacy Navigator'
+        self.legacy_showing_directory = True
+        w = self.output[page]
+        w.configure(state='normal')
+        w.delete('1.0', 'end')
+        colours = legacy_palette(self.legacy_theme.get())
+        w.configure(background=colours['background'], foreground=colours['foreground'],
+                    insertbackground=colours['foreground'])
+        self.legacy_apply_font()
+        w.tag_configure('legacy_heading', foreground=colours['heading'], spacing1=10)
+        w.tag_configure('legacy_info', foreground=colours['info'])
+        w.tag_configure('legacy_service', foreground=colours['heading'], spacing1=8)
+        w.tag_configure('legacy_indent', lmargin1=24, lmargin2=24)
+        w.tag_configure('legacy_compact', lmargin1=0, lmargin2=24, spacing1=4)
+        w.insert('end', 'Services you can explore\n', 'legacy_heading')
+        w.insert('end', 'Networks from before the Web and new small-Internet protocols. Click an example to open it, '
+                 'or type an address in the bar above. Come back here with ☰ Services.\n\n', 'legacy_info')
+        grouped = [group for group in services_by_group() if group[4]]
+        # Quick index: one click jumps to the explanation.
+        for number, (_key, _title, short, _explanation, services) in enumerate(grouped):
+            w.insert('end', short + ': ', 'legacy_info')
+            for name, *_rest in services:
+                tag = 'legacy_directory_jump_' + legacy_anchor(name)
+                w.tag_configure(tag, foreground=colours['folder'], underline=1)
+                w.insert('end', name, tag)
+                w.insert('end', '  ')
+                w.tag_bind(tag, '<Button-1>', lambda e, mark='legacy_service_' + legacy_anchor(name), widget=w: (
+                    widget.yview(mark)))
+                w.tag_bind(tag, '<Enter>', lambda e, widget=w: widget.configure(cursor='hand2'))
+                w.tag_bind(tag, '<Leave>', lambda e, widget=w: widget.configure(cursor='xterm'))
+            w.insert('end', '\n')
+        link_count = 0
+        for key, title, _short, explanation, services in grouped:
+            w.insert('end', '\n{}\n'.format(title.upper()), 'legacy_heading')
+            w.insert('end', explanation + '\n', 'legacy_info')
+            for name, _group, form, description, examples in services:
+                compact = key in ('experimental', 'reference') and not examples
+                w.mark_set('legacy_service_' + legacy_anchor(name), 'end-1c')
+                w.mark_gravity('legacy_service_' + legacy_anchor(name), 'left')
+                if compact:
+                    w.insert('end', name, ('legacy_service', 'legacy_compact'))
+                    w.insert('end', '  {}  '.format(form), ('legacy_info', 'legacy_compact'))
+                    w.insert('end', description + '\n', 'legacy_compact')
+                    continue
+                w.insert('end', '\n{}'.format(name), 'legacy_service')
+                w.insert('end', '   ' + form + '\n', 'legacy_info')
+                w.insert('end', description + '\n', 'legacy_indent')
+                if not examples and key == 'ready':
+                    w.insert('end', LEGACY_NO_EXAMPLE + '\n', ('legacy_info', 'legacy_indent'))
+                for label, url in examples:
+                    tag = 'legacy_directory_link_{}'.format(link_count)
+                    link_count += 1
+                    w.tag_configure(tag, foreground=colours['document'], underline=1)
+                    w.insert('end', '▸ ', 'legacy_indent')
+                    w.insert('end', label, (tag, 'legacy_indent'))
+                    if not url.startswith('nettalabbo:'):
+                        w.insert('end', '   ' + url, ('legacy_info', 'legacy_indent'))
+                    w.insert('end', '\n', 'legacy_indent')
+                    w.tag_bind(tag, '<Button-1>', lambda e, target=url: self.legacy_directory_open(target))
+                    w.tag_bind(tag, '<Enter>', lambda e, target=url, widget=w: (
+                        widget.configure(cursor='hand2'), self.legacy_status_detail.set(target)))
+                    w.tag_bind(tag, '<Leave>', lambda e, widget=w: (
+                        widget.configure(cursor='xterm'),
+                        self.legacy_status_detail.set(legacy_link_legend(self.legacy_theme.get()))))
+        w.insert('end', '\nThese are independent public services run by third parties: they may change, '
+                 'be offline, or ask for registration.\n', 'legacy_info')
+        w.configure(state='disabled')
+        w.yview_moveto(0)
+        self.legacy_links_menu.delete(0, 'end')
+        self.legacy_current_links = []
+        self.legacy_links_button.configure(text='Links (0) ▾', state='disabled')
+        self.legacy_detail.set('Choose a service below or enter its address above.')
+        self.legacy_update_navigation()
+
+    def legacy_directory_open(self, target):
+        if target == 'nettalabbo:catalogue':
+            self.historic_servers_dialog('Telnet')
+            return
+        self.legacy_navigate(target)
+
     def legacy_example_dialog(self):
         # Public reference endpoints only; individual services may change or become unavailable.
         examples = [
@@ -2361,17 +2429,6 @@ class App:
                 self.select_page('Legacy Navigator')
         listing.bind('<Double-Button-1>', lambda e: use_selected())
         ttk.Button(panel, text='Use selected address', command=use_selected).pack(anchor='e', pady=(9,0))
-
-    def legacy_catalog_selected(self,event=None):
-        selected=self.legacy_catalog.selection()
-        if not selected:return
-        values=self.legacy_catalog.item(selected[0],'values')
-        title=values[0]
-        entry=next((item for item in CATALOG if item[0]==title),None)
-        if not entry:return
-        self.legacy_detail.set('{}: {}  |  {}'.format(title,values[3],entry[4]))
-        if not self.inputs['legacy_url'].get().strip():
-            self.inputs['legacy_url'].set(entry[1][0]+'://')
 
     def legacy_deliver(self, result, stop):
         task = self.tasks.get('Legacy Navigator')

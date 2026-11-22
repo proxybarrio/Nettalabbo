@@ -32,6 +32,16 @@ common TCP adapter; other adapters use bounded network timeouts.
   input (typed hidden); the answer is sent back as the URL query, as the
   Gemini specification requires. Cancelling leaves the page unchanged.
 
+### Services start page (0.5.4)
+
+The Navigator opens on a page that explains each service in plain words and
+groups it by what you can do: read it directly, try an experimental reader,
+open an interactive terminal (Telnet and SSH), upload (Titan), or learn that it
+is not available yet. A one-click index at the top jumps to each explanation,
+and public examples open with a click. **☰ Services** returns to this page at
+any time; **Home** does the same when the address bar is empty. The examples
+are independent services run by third parties and may change or be offline.
+
 
 ## Present in Nettalabbo
 
