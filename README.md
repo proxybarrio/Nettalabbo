@@ -34,7 +34,7 @@ Download the `.deb` release and, from its directory, run:
 
 ```bash
 sudo apt update
-sudo apt install ./nettalabbo_0.5.4-2_all.deb
+sudo apt install ./nettalabbo_0.5.4-3_all.deb
 ```
 
 APT resolves and installs required system packages from your configured Ubuntu repositories. The package uses the identity `nettalabbo` and replaces packages previously named `netlabbo`, `network-laboratory-xubuntu` or `netlab-xubuntu`, preserving personal configuration files for migration. Launch the app from the Xubuntu menu or run:

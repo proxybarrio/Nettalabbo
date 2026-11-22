@@ -35,6 +35,7 @@ from legacy_protocols import CATALOG, SCHEMES, fetch as legacy_fetch, parse_url 
 from mail_inspector import inspect_address, normalise_email, test_mail_service, MailInspectionError
 import time_services
 import service_catalog
+import trace_probe
 import dns_lookup
 import updater
 from historic_servers import HISTORIC_SERVERS, catalog_groups, get_entry, connection_fields, protocol_endpoint, access_label
@@ -45,7 +46,7 @@ from urllib.parse import urlsplit, urlunsplit, quote as url_quote
 import webbrowser
 
 VERSION = '0.5.4'
-PACKAGE_VERSION = '0.5.4-2'  # must match packaging/control
+PACKAGE_VERSION = '0.5.4-3'  # must match packaging/control
 APP_DIR = Path.home() / '.config' / 'nettalabbo'
 ASSETS_DIR = Path(__file__).resolve().parent / 'assets'
 LEGACY_SETTINGS_FILES = [
@@ -501,7 +502,11 @@ class App:
             except Exception as e:
                 if not stop.is_set():
                     self.failed_tasks.add(page)
-                    self.post(self.append, page, f'Error: {e}\n')
+                    if page in self.trees:
+                        # Table pages have no text area: show the error as a row.
+                        self.post(self.add_row, page, ('!', '', '', f'Error: {e}'[:160]))
+                    else:
+                        self.post(self.append, page, f'Error: {e}\n')
             finally: self.post(self.finish, page, stop)
         threading.Thread(target=run, daemon=True, name=f'Nettalabbo-{page}').start()
 
@@ -1020,7 +1025,13 @@ class App:
                 if server:self.remember('DNS_server')
                 args=(host,self.dns_type.get(),server)
         self.clear(page)
-        if page in ('Ping','Trace'):
+        method_var=self.probe_vars.get('Trace',{}).get('Probe method') if page=='Trace' else None
+        if page=='Trace' and (method_var.get() if method_var is not None else 'Auto')!='TCP':
+            # Built-in tracer: works for normal users with every traceroute version.
+            # Read the Tk settings here, in the main thread, before the worker starts.
+            settings=self.native_trace_settings()
+            self.start(page,lambda stop:self.run_native_trace(page,args[0],stop,settings))
+        elif page in ('Ping','Trace'):
             cmd,resolve=self.build_probe_command(page,args[0])
             self.start(page,lambda stop:self.run_probe(page,args[0],cmd,resolve,stop))
         else:
@@ -1250,6 +1261,9 @@ class App:
                                 self.post(self.add_row,page,(row[0],row[1],row[2] if resolve else '',row[3]))
                             elif output and not output.startswith('traceroute to'):
                                 self.post(self.add_row,page,('!', '', '', output[:130]))
+                                if 'enough privileges' in output:
+                                    self.post(self.add_row,page,('!', '', '', 'TCP probes need administrator rights. '
+                                                                 'Choose Auto, UDP or ICMP instead.'))
                     if stop.is_set() and proc.poll() is None:
                         proc.terminate()
                     try:
@@ -1278,6 +1292,68 @@ class App:
         elif not stop.is_set() and page == 'Trace' and not reached_destination:
             self.task_outcomes = getattr(self, 'task_outcomes', {})
             self.task_outcomes[page] = 'Partial trace: destination not confirmed.'
+
+    def native_trace_settings(self):
+        v=self.probe_vars['Trace']
+        method=v.get('Probe method')
+        method=method.get() if method is not None else 'Auto'
+        hops=max(1,min(64,int(v['Maximum hops'].get())))
+        return dict(method=method if method in ('Auto','ICMP','UDP') else 'Auto',
+                    max_hops=hops,
+                    first_hop=max(1,min(hops,int(v['Start from hop'].get()))),
+                    timeout=max(1,min(60,int(v['Timeout (s)'].get()))),
+                    payload_size=max(0,min(1400,int(v['Data size'].get()))-28),
+                    parallel=4 if v['Parallel Trace'].get() else 1,
+                    delay=max(0,min(20000,int(v['Delay (ms)'].get())))/1000.0), bool(v['Resolve IP address'].get())
+
+    def run_native_trace(self,page,host,stop,settings=None):
+        settings,resolve=settings if settings is not None else self.native_trace_settings()
+        settings=dict(settings)
+        try:
+            tracer=trace_probe.Tracer(host,stop=stop,**settings)
+        except trace_probe.TraceError as e:
+            self.failed_tasks.add(page)
+            self.post(self.add_row,page,('!',host,'',str(e)[:160]))
+            return
+        kinds=' + '.join(tracer.kinds)
+        self.post(self.set_status,page,f'Tracing {host} [{tracer.address}] with {kinds} probes...')
+        answered=0
+        reached=False
+        last_answer=0
+        unreachable=None
+        for hop,address,rtt,arrived,flag in tracer.trace():
+            if address is None:
+                self.post(self.add_row,page,(hop,'*','*' if resolve else '','*'))
+                continue
+            answered+=1
+            last_answer=hop
+            reached=reached or arrived
+            name=(trace_probe.reverse_name(address) or address) if resolve else ''
+            timing=f'{rtt:.2f} ms' + (f' {flag}' if flag else '')
+            self.post(self.add_row,page,(hop,address,name,timing))
+            if flag and not arrived:
+                unreachable=(address,flag)
+        if stop.is_set():
+            return
+        if answered==0:
+            self.failed_tasks.add(page)
+            self.post(self.add_row,page,('!',host,'','No router answered. A firewall on this computer or network may block the probes.'))
+        elif reached:
+            return
+        elif unreachable:
+            meaning={'!N':'network','!H':'host','!P':'protocol','!X':'destination (administratively blocked)'}
+            self.post(self.add_row,page,('!','','',f'Router {unreachable[0]} reports that the '
+                                         f'{meaning.get(unreachable[1],"destination")} is unreachable ({unreachable[1]}).'))
+            self.task_outcomes=getattr(self,'task_outcomes',{})
+            self.task_outcomes[page]='Partial trace: destination unreachable.'
+        elif tracer.stopped_silent:
+            self.post(self.add_row,page,('!','','',f'No answers after hop {last_answer}: the destination or a firewall '
+                                         'in front of it does not reply to trace probes.'))
+            self.task_outcomes=getattr(self,'task_outcomes',{})
+            self.task_outcomes[page]='Partial trace: destination not confirmed.'
+        else:
+            self.task_outcomes=getattr(self,'task_outcomes',{})
+            self.task_outcomes[page]='Partial trace: destination not confirmed.'
 
     def address_book(self):
         w=tk.Toplevel(self.root);w.title('Address Book');w.geometry('480x350');w.transient(self.root)

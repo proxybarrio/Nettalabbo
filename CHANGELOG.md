@@ -1,3 +1,11 @@
+## 0.5.4 Debian revision 3 (22 November 2026)
+
+- Trace: new built-in tracer for the Auto, UDP and ICMP methods. It works for normal users on every supported Ubuntu release, without root rights and without depending on the installed traceroute version. Before, the default ICMP method ran `traceroute -I`, which as a normal user either needs privileges or, with some traceroute versions and kernels, returns only asterisks.
+- Trace: Auto sends UDP and, where the system allows unprivileged ICMP, ICMP echo probes together and keeps the first answer per hop; two tries per hop; hops answered in parallel are listed in order.
+- Trace: stops at the destination, at an unreachable answer (with an explanation of !N, !H, !P, !X), or after 8 consecutive silent hops (likely a firewall), instead of printing asterisks up to the maximum.
+- Trace: a host reachable only over IPv6 on a computer without IPv6 is explained instead of failing; TCP (still the external traceroute, administrator rights required) suggests Auto when privileges are missing.
+- Fix: a failure in a table page (Ping, Trace, Port Scan) is now shown as a table row; before, the message went to a text area those pages do not have, so nothing appeared.
+
 ## 0.5.4 Debian revision 2 (22 November 2026)
 
 - Packaging: the source and the .deb no longer include internal pre-release working notes; the README ends with the project contact.
