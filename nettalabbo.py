@@ -50,7 +50,7 @@ from urllib.parse import urlsplit, urlunsplit, quote as url_quote, unquote as ur
 import webbrowser
 
 VERSION = '0.5.5'
-PACKAGE_VERSION = '0.5.5-1'  # must match packaging/control
+PACKAGE_VERSION = '0.5.5-2'  # must match packaging/control
 APP_DIR = Path.home() / '.config' / 'nettalabbo'
 ASSETS_DIR = Path(__file__).resolve().parent / 'assets'
 LEGACY_SETTINGS_FILES = [

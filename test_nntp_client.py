@@ -258,6 +258,18 @@ class HelperTest(unittest.TestCase):
         # Thread of message 1 has the newest reply (4 Nov), so it comes first.
         self.assertEqual(order, [('', 1), ('<a1@x>', 2), ('<a2@x>', 4), ('', 3), ('', 5)])
 
+    def test_very_long_reply_chain(self):
+        records = [{'number': i, 'message_id': '<{}@x>'.format(i),
+                    'references': ['<{}@x>'.format(i - 1)] if i else [], 'timestamp': float(i)}
+                   for i in range(3000)]
+        ordered = build_threads(list(reversed(records)))
+        self.assertEqual([r['number'] for _p, r in ordered], list(range(3000)))
+        depth = {}
+        for parent, record in ordered:
+            depth[record['message_id']] = depth[parent] + 1 if parent else 0
+        self.assertEqual(max(depth.values()), nntp_client.MAX_THREAD_DEPTH)
+        self.assertEqual(ordered[41][0], '<39@x>')
+
     def test_reference_loop_keeps_every_message(self):
         records = self.records()[:2]
         records[0]['references'] = ['<a2@x>']

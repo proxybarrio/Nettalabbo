@@ -24,6 +24,7 @@ MAX_LIST_BYTES = 64_000_000      # full LIST ACTIVE of a large Usenet server
 MAX_ARTICLE_BYTES = 2_000_000
 MAX_OVERVIEW = 2000
 DEFAULT_BATCH = 200
+MAX_THREAD_DEPTH = 40           # deeper replies are shown at this indentation
 
 # name, host, port, tls, account, description
 PUBLIC_SERVERS = (
@@ -372,7 +373,8 @@ def build_threads(records):
     """Arrange overview records as threads.
 
     Returns [(parent message-id or '', record)] ordered so a parent always
-    comes before its replies; threads are ordered by their newest message,
+    comes before its replies (beyond MAX_THREAD_DEPTH levels a reply is
+    attached to the deepest shown ancestor); threads are ordered by their newest message,
     newest first, replies inside a thread by date.
     """
     by_id = {r['message_id']: r for r in records if r['message_id']}
@@ -393,30 +395,45 @@ def build_threads(records):
         else:
             roots.append(record)
 
-    def newest(record, seen):
-        best = record['timestamp']
-        for child in children.get(record['message_id'], ()):
-            if child['number'] not in seen:
-                seen.add(child['number'])
-                best = max(best, newest(child, seen))
+    # Iterative on purpose: a long chain of replies must not hit Python's
+    # recursion limit, and very deep threads stay readable.
+    def newest(root):
+        best, stack, seen = root['timestamp'], [root], {root['number']}
+        while stack:
+            record = stack.pop()
+            best = max(best, record['timestamp'])
+            for child in children.get(record['message_id'], ()):
+                if child['number'] not in seen:
+                    seen.add(child['number'])
+                    stack.append(child)
         return best
 
-    roots.sort(key=lambda r: newest(r, {r['number']}), reverse=True)
+    roots.sort(key=newest, reverse=True)
     ordered, placed = [], set()
 
-    def walk(record, parent_id):
-        if record['number'] in placed:
-            return
-        placed.add(record['number'])
-        ordered.append((parent_id, record))
-        for child in sorted(children.get(record['message_id'], ()), key=lambda r: r['timestamp']):
-            walk(child, record['message_id'])
+    def walk(root):
+        stack = [(root, '', 0)]
+        anchors = {}            # depth -> message-id used as parent at that depth
+        while stack:
+            record, parent_id, depth = stack.pop()
+            if record['number'] in placed:
+                continue
+            placed.add(record['number'])
+            ordered.append((parent_id, record))
+            if depth < MAX_THREAD_DEPTH:
+                anchors[depth] = record['message_id']
+                child_parent, child_depth = record['message_id'], depth + 1
+            else:
+                child_parent, child_depth = parent_id, depth
+            replies = sorted(children.get(record['message_id'], ()), key=lambda r: r['timestamp'])
+            for child in reversed(replies):
+                stack.append((child, child_parent, child_depth))
 
     for root in roots:
-        walk(root, '')
+        walk(root)
     for record in records:          # reference loops: never lose a message
         if record['number'] not in placed:
-            walk(record, '')
+            walk(record)
     return ordered
 
 

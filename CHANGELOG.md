@@ -1,3 +1,7 @@
+## 0.5.5 Debian revision 2 (28 November 2026)
+
+- Newsgroups: fixed a crash when a discussion contained a very long chain of nested replies (around a thousand levels, possible on busy mailing lists after loading older messages): the message list stopped updating. Threads are now built without recursion, and replies nested deeper than 40 levels are shown at that indentation so the list stays readable.
+
 ## 0.5.5 Debian revision 1 (28 November 2026)
 
 - Newsgroups: new page to read and write Usenet newsgroups and mailing lists published as newsgroups. Groups on the left with search and ★ subscriptions; discussions shown as threads with unread messages in bold (remembered between sessions); the selected message below, with quoted text coloured, the signature dimmed, binary posts (yEnc, uuencode, MIME attachments) summarised instead of downloaded, Save as text or original message.
