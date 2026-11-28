@@ -33,7 +33,7 @@ CATALOG=[
     ('Titan',           ('titan',), 1965, 'upload', 'Explicit, confirmed TLS file upload (max 256 KiB). Never initiated by Browse.'),
     ('Scroll',          ('scroll',), 5699, 'read', 'TLS document retrieval and Scroll metadata (experimental).'),
     ('Finger',          ('finger',), 79, 'read', 'Read Finger information over TCP.'),
-    ('Usenet / NNTP',   ('news', 'nntp'), 119, 'read', 'Read group status and recent article headers; no posting.'),
+    ('Usenet / NNTP',   ('news', 'nntp'), 119, 'read', 'Quick read-only look at a group; the Newsgroups page reads, replies and posts.'),
     ('Telnet / SSH',    ('telnet', 'ssh'), 23, 'remote', 'Open the existing remote terminal in Nettalabbo.'),
     ('Anonymous FTP',  ('ftp',), 21, 'read', 'Anonymous directory listing; no uploads or downloads.'),
     ('DICT',            ('dict',), 2628, 'read', 'Dictionary definition lookup (RFC 2229).'),

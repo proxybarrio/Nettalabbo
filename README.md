@@ -2,7 +2,7 @@
 
 **Network Laboratory app for Xubuntu and other Ubuntu systems**
 
-**Current version:** 0.5.4 (Debian packaging revision 1)  
+**Current version:** 0.5.5 (Debian packaging revision 1)  
 **Status:** experimental / active testing  
 **Platform:** Xubuntu and other Ubuntu-based Linux systems  
 **Written by:** Proxybarrio, with AI-assisted development  
@@ -34,7 +34,7 @@ Download the `.deb` release and, from its directory, run:
 
 ```bash
 sudo apt update
-sudo apt install ./nettalabbo_0.5.4-5_all.deb
+sudo apt install ./nettalabbo_0.5.5-1_all.deb
 ```
 
 APT resolves and installs required system packages from your configured Ubuntu repositories. The package uses the identity `nettalabbo` and replaces packages previously named `netlabbo`, `network-laboratory-xubuntu` or `netlab-xubuntu`, preserving personal configuration files for migration. Launch the app from the Xubuntu menu or run:
@@ -46,6 +46,11 @@ nettalabbo
 Nettalabbo works on the current Xubuntu and Ubuntu release and on older releases back to 20.04 LTS, where it has been tested. Releases older than 20.04 have not been tested. Ubuntu 20.04 is outside standard security support; keep it covered by extended security maintenance if you use it for network work.
 
 See [INSTALL_XUBUNTU.md](INSTALL_XUBUNTU.md) and [UPGRADE_POLICY.md](UPGRADE_POLICY.md).
+
+## New in 0.5.5
+
+- **Newsgroups:** a three-pane Usenet reader in the tradition of the Netscape and SeaMonkey news readers: groups, threaded discussions and messages, replies with quoting and new posts. Ready-made public servers (Paganini, Gmane, the Linux kernel lists, Rocksolid, Eternal September, NNTP4) and your own servers; anonymous or with a user name and password, with or without TLS. A password is saved only if you ask.
+- **Legacy Navigator:** a start page that explains every service in plain words, with clickable examples.
 
 ## New in 0.5.4
 

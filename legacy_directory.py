@@ -43,8 +43,9 @@ SERVICES = [
      'Browse public file archives, read only.',
      [('GNU project archive', 'ftp://ftp.gnu.org/gnu/')]),
     ('Usenet / NNTP', 'ready', 'nntp://',
-     'Discussion groups from the 1980s that are still active. Most servers need a free account.',
-     [('Eternal September (free registration required)', 'nntp://news.eternal-september.org/')]),
+     'Discussion groups from the 1980s that are still active. The Newsgroups page is a full reader: '
+     'threads, replies and posting, anonymously or with an account.',
+     [('Open the Newsgroups reader (Paganini, Gmane, Eternal September and more)', 'nettalabbo:newsgroups')]),
     ('Nex', 'ready', 'nex://',
      'Directory listings and plain text in the simplest possible protocol.',
      [('Nightfall City community', 'nex://nightfall.city/')]),

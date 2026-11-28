@@ -87,7 +87,16 @@ class NavigatorTest(unittest.TestCase):
             self.skipTest(f'No display: {exc}')
         self.root.withdraw()
         import nettalabbo
+        from pathlib import Path
         self.n = nettalabbo
+        # nettalabbo computes its settings paths at import time: point them to
+        # the temporary home so the test never touches real user settings.
+        app_dir = Path(self.home.name) / '.config' / 'nettalabbo'
+        for name, value in (('APP_DIR', app_dir), ('SETTINGS_FILE', app_dir / 'settings.json'),
+                            ('LEGACY_SETTINGS_FILES', [])):
+            patcher = patch.object(nettalabbo, name, value)
+            patcher.start()
+            self.addCleanup(patcher.stop)
         self.app = nettalabbo.App(self.root)
         self.app.select_page('Legacy Navigator')
 

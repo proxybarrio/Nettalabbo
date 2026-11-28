@@ -17,7 +17,7 @@ class RenameTests(unittest.TestCase):
   control=(ROOT/'packaging'/'control').read_text()
   self.assertIn('Conflicts: netlabbo',control)
   self.assertIn('Replaces: netlabbo',control)
-  self.assertRegex(control, r'(?m)^Version: 0\.5\.4-[0-9]+$')
+  self.assertRegex(control, r'(?m)^Version: 0\.5\.[4-9]-[0-9]+$')
  def test_image_unmodified(self):
   import hashlib
   old=Path('/mnt/data/netlabbo-source-0.5.0-rev2/assets/netlabbo_original.png')

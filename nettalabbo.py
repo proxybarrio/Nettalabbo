@@ -33,6 +33,7 @@ from domain_rdap import lookup_domain, LookupError, normalise_domain
 from remote_terminal import PtySession, TerminalScreen, connection_command
 from terminal_colours import ColourTerminalScreen
 from diagnose import diagnose as run_domain_diagnose
+from news_ui import NewsPage
 from legacy_directory import services_by_group, anchor as legacy_anchor, NO_EXAMPLE as LEGACY_NO_EXAMPLE
 from legacy_protocols import SCHEMES, fetch as legacy_fetch, parse_url as parse_legacy_url, TrustRequired, LegacyError, titan_upload
 from mail_inspector import inspect_address, normalise_email, test_mail_service, MailInspectionError
@@ -48,8 +49,8 @@ from legacy_theme import THEME_NAMES as LEGACY_THEME_NAMES, palette as legacy_pa
 from urllib.parse import urlsplit, urlunsplit, quote as url_quote, unquote as url_unquote
 import webbrowser
 
-VERSION = '0.5.4'
-PACKAGE_VERSION = '0.5.4-5'  # must match packaging/control
+VERSION = '0.5.5'
+PACKAGE_VERSION = '0.5.5-1'  # must match packaging/control
 APP_DIR = Path.home() / '.config' / 'nettalabbo'
 ASSETS_DIR = Path(__file__).resolve().parent / 'assets'
 LEGACY_SETTINGS_FILES = [
@@ -170,7 +171,7 @@ SECTIONS = {
     'Network checks': ['Ping', 'Trace', 'Scanner'],
     'Remote access': ['SSH', 'Telnet'],
     'Classic services': ['Finger', 'Time', 'Quote'],
-    'Legacy stuff': ['Legacy Navigator'],
+    'Legacy stuff': ['Legacy Navigator', 'Newsgroups'],
     'Application': ['Info', 'Options', 'About'],
 }
 PAGE_LABELS = {
@@ -184,6 +185,7 @@ PAGE_LABELS = {
 PAGE_DESCRIPTIONS = {
     'Overview': 'A practical workspace for understanding networks, domains and remote hosts.',
     'Legacy Navigator': 'Browse classic networks through clickable, underlined links. Switch between rendered and raw protocol views.',
+    'Newsgroups': 'Read and write Usenet newsgroups and mailing lists, anonymously or with your account.',
     'Mail Inspector': 'Inspect MX routing, optional single-address SMTP acceptance, and POP3/IMAP/SMTP connectivity.',
     'Diagnose': 'Inspect DNS, MX, SPF, DMARC, DKIM and opt-in DNS blacklists.',
     'Domain Inspector': 'Identify a public domain registry, then request available registration information.',
@@ -335,6 +337,7 @@ class App:
             self.make_network_page(name)
         self.make_time_page()
         self.make_legacy_page()
+        self.news_page = NewsPage(self, self.pages['Newsgroups'], 'Nettalabbo/' + PACKAGE_VERSION)
         self.make_scanner_page()
         self.make_remote_page('SSH')
         self.make_remote_page('Telnet')
@@ -2396,6 +2399,9 @@ class App:
         if target == 'nettalabbo:catalogue':
             self.historic_servers_dialog('Telnet')
             return
+        if target == 'nettalabbo:newsgroups':
+            self.select_page('Newsgroups')
+            return
         self.legacy_navigate(target)
 
     def legacy_example_dialog(self):
@@ -2968,6 +2974,7 @@ class App:
             'Enter a domain, then press Look up to request public registration data.\n'
             'Press the operation button to start; Cancel interrupts the current task.\n'
             'Right click a Ping, Trace or Scanner result to send an address to another tool.\n'
+            'Newsgroups reads and posts to Usenet: choose a server, Get groups, double-click a group.\n'
             'Alternative Networks accepts URLs such as gopher://, gemini://, nntp://, ftp:// and dict://.\n'
             'Click coloured, underlined links. Go/Enter navigates, Back and Forward revisit cached pages.\n'
             'Stop cancels the pending request. Rendered displays links; Raw shows available transport bytes.\n'

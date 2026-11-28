@@ -1,3 +1,11 @@
+## 0.5.5 Debian revision 1 (28 November 2026)
+
+- Newsgroups: new page to read and write Usenet newsgroups and mailing lists published as newsgroups. Groups on the left with search and ★ subscriptions; discussions shown as threads with unread messages in bold (remembered between sessions); the selected message below, with quoted text coloured, the signature dimmed, binary posts (yEnc, uuencode, MIME attachments) summarised instead of downloaded, Save as text or original message.
+- Newsgroups: New message and Reply (quotes the text, keeps References, follows Followup-To). Every post asks for confirmation; a server that refuses posting, or needs an account, is explained in plain words.
+- Newsgroups: ready-made public servers (Paganini, Gmane, Linux kernel lists on lore.kernel.org, Rocksolid, Eternal September, NNTP4) plus your own servers. Anonymous access or user name and password (AUTHINFO); TLS on port 563 with certificate verification; a warning before a password is sent without encryption. The password is stored only when you choose Remember, in the private settings file readable by you alone; otherwise it is asked once per session.
+- Newsgroups: each operation uses its own short connection and can be cancelled; large groups load 200 messages at a time (Older loads more), and very large group lists are filtered with Find.
+- Legacy Navigator: the Usenet entry on the services page opens the new reader.
+
 ## 0.5.4 Debian revision 5 (22 November 2026)
 
 - Legacy Navigator: new start page that lists every service in plain words, grouped by what you can do with it (ready to browse, experimental, interactive terminals, upload, not yet available), with a one-click index at the top and clickable public examples (Gopher, Gemini and a Gemini search engine, Spartan, Finger weather, DICT, anonymous FTP, Usenet, Nex). It opens with the page and returns with the new ☰ Services button, or with Home when no address is entered; Back returns to the last page visited.

@@ -22,6 +22,6 @@ class CreditsTests(unittest.TestCase):
         self.assertIn('NetLab95', source)
         self.assertIn('Alexander Danileiko', source)
         self.assertIn('not a port', source)
-        self.assertEqual(nettalabbo.VERSION, '0.5.4')
+        self.assertEqual(nettalabbo.VERSION, '0.5.5')
 
 if __name__ == '__main__': unittest.main()

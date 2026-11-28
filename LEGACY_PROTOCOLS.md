@@ -1,4 +1,4 @@
-# Legacy & Alternative Networks in Nettalabbo 0.5.4
+# Legacy & Alternative Networks in Nettalabbo 0.5.5
 
 The Legacy Navigator provides explicitly triggered and bounded protocol tools.
 There is no automatic browsing at startup and no remote code execution.
@@ -31,6 +31,17 @@ common TCP adapter; other adapters use bounded network timeouts.
 * **Gemini questions:** status 10 asks for text and status 11 for sensitive
   input (typed hidden); the answer is sent back as the URL query, as the
   Gemini specification requires. Cancelling leaves the page unchanged.
+
+### Newsgroups reader (0.5.5)
+
+`nntp://` addresses in the Navigator still give a quick read-only look at a
+group. For real use there is the **Newsgroups** page: a three-pane reader
+(groups, threads, message) that can also reply and post. It speaks NNTP as
+described in RFC 3977, with AUTHINFO USER/PASS (RFC 4643) for accounts and
+implicit TLS on port 563. Ready-made servers cover anonymous Usenet reading
+(Paganini, Rocksolid), mailing lists as newsgroups (Gmane, lore.kernel.org)
+and free accounts (Eternal September, NNTP4); any other server can be added.
+Passwords are kept only for the session unless you choose to remember them.
 
 ### Services start page (0.5.4)
 

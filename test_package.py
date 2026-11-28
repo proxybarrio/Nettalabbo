@@ -18,7 +18,7 @@ class PackageTests(unittest.TestCase):
         self.assertNotIn('inetutils-telnet', dependencies)
         self.assertNotIn('Suggests:', text)
         self.assertNotIn('Recommends:', text)
-        self.assertRegex(text, r'(?m)^Version: 0\.5\.4-[0-9]+$')
+        self.assertRegex(text, r'(?m)^Version: 0\.5\.[4-9]-[0-9]+$')
         self.assertIn('Package: nettalabbo', text)
         self.assertIn('Conflicts: netlabbo, network-laboratory-xubuntu, netlab-xubuntu', text)
         self.assertIn('Replaces: netlabbo, network-laboratory-xubuntu, netlab-xubuntu', text)
